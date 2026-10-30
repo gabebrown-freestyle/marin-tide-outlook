@@ -151,9 +151,9 @@ a{color:var(--s1)}
 
 <section>
   <h2>Daily high tide forecast</h2>
-  <p class="sub">The highest tide each day at the San Francisco gauge: NOAA's prediction, and the forecast with today's anomaly added. The shaded band is ±0.25 ft of uncertainty in the anomaly.</p>
+  <p class="sub">The highest tide each day at the San Francisco gauge: NOAA's prediction, and the forecast with the sea-level anomaly and forecast weather added. Weather uses the 16-day pressure and wind forecast; after that, average weather is assumed. The shaded band is ±0.25 ft.</p>
   <div class="card">
-    <div class="keyrow"><span><i style="background:var(--s1)"></i>Forecast (prediction + anomaly)</span><span><i style="background:var(--muted)"></i>NOAA prediction only</span></div>
+    <div class="keyrow"><span><i style="background:var(--s1)"></i>Forecast (prediction + anomaly + weather)</span><span><i style="background:var(--muted)"></i>NOAA prediction only</span></div>
     <div class="chart" id="peakChart"></div>
     <details><summary>Show as table</summary><div id="peakTable"></div></details>
   </div>
@@ -173,10 +173,11 @@ a{color:var(--s1)}
   <h2>How this works, and its limits</h2>
   <ul class="method">
     <li><b>Tide:</b> NOAA's hourly predictions for the San Francisco gauge (9414290), in feet above mean lower low water. All thresholds use that same scale.</li>
-    <li><b>Anomaly:</b> measured minus predicted water level at San Francisco, averaged over the hour either side of the last two high tides (or the last 25 hours if that's unavailable). It's carried forward unchanged, which holds well for slow Kelvin wave buildups but says nothing about storms.</li>
+    <li><b>Anomaly:</b> measured minus predicted water level at San Francisco, averaged over the hour either side of the last two high tides (or the last 25 hours if that's unavailable). The current weather effect is subtracted out, and what's left (mostly the slow Kelvin wave buildup) is carried forward unchanged.</li>
     <li><b>Street lookup:</b> flood lines for 246 streets come from a flood-connectivity model on 2018 USGS 1-meter lidar with SFEI Bay Shore Inventory barriers and tide gates treated as closed, run at 5 cm water-level steps. Five streets are calibrated from resident reports; the rest are model estimates (about ±0.5 ft). "Behind levees / pumps" means the street is below ordinary high tides and stays dry only because of infrastructure.</li>
     <li><b>Thresholds:</b> each street's flood lines come from a 1-meter lidar flood model, SFEI's Bay shoreline data, resident photos (Jan 1–3, 2026 and Oct 27–29, 2026) and the WET app's flood lines. They are estimates. Pump stations, storm drains and rain all shift them.</li>
-    <li><b>Not included:</b> storm surge, wind and rain. During a storm, check the <a href="https://www.weather.gov/mtr/">NWS Bay Area coastal flood advisories</a>.</li>
+    <li><b>Weather:</b> low pressure and southerly winds raise the Bay; high pressure and northerly or westerly winds lower it. Fit on 10 years of NOAA Richmond data: about −1.04 cm per millibar (the classic inverse-barometer effect) and, for a steady 10 m/s (22 mph) wind, about +17 cm (6.6 in) from the southeast or −17 cm from the northwest. It explains roughly half of a typical storm surge. Weather forecasts come from <a href="https://open-meteo.com/">Open-Meteo</a> for the Golden Gate area, and the current weather effect is removed from today's anomaly so it isn't counted twice.</li>
+    <li><b>Not included:</b> rain, waves, river flow, and local effects inside San Rafael Bay and Corte Madera Creek beyond what the Richmond gauge sees. During a storm, check the <a href="https://www.weather.gov/mtr/">NWS Bay Area coastal flood advisories</a>.</li>
     <li>This is a community project, not an official warning. Don't drive through floodwater.</li>
   </ul>
 </section>
@@ -204,6 +205,9 @@ const LOCATIONS = [
 ];
 const SF="9414290";
 const TREND_STATIONS=[{id:"9410170",name:"San Diego"},{id:"9412110",name:"Port San Luis"},{id:"9413450",name:"Monterey"},{id:"9414290",name:"San Francisco"}];
+// Weather (pressure + wind) effect on short-term water level, fit on Richmond gauge 2015-2023, tested 2024-2026:
+// cm per hPa of sea-level pressure, and cm per (m/s)^2 of 12-hour mean wind stress toward east / north (SF winds).
+const WX={cp:-1.04,cu:-0.109,cv:0.127,lat:37.806,lon:-122.466};
 const UNCERT=0.25, MAXDAYS=31; let DAYS=30;
 /* ======================================================================= */
 
@@ -267,12 +271,12 @@ function renderStreet(){
     body=`<div class="thr"><div>Lowest ground on the street<b>${s.low.toFixed(1)} ft</b></div><div>Watch when the SF tide forecast reaches<b>${PROT_WATCH.toFixed(1)} ft</b></div></div>
       <div class="hint">Parts of this street sit below ordinary high tides and are kept dry by levees, tide gates or pumps. This tool can't predict when those are overwhelmed. On Jan 2–3, 2026 (8.1–8.3 ft at SF) several protected areas in Corte Madera and San Rafael flooded.</div>`;
     if(days){const w=days.filter(d=>d.fc>=PROT_WATCH);
-      body+= w.length?`<ul style="margin-top:10px">${w.map(d=>`<li>${pill("minor").replace("Minor","Watch")}<span class="when">${fmtDay(d.t)} · forecast ${d.fc.toFixed(1)} ft · ~${fmtTime(new Date(d.t.getTime()+35*60e3))}</span></li>`).join("")}</ul>`:`<div class="hint" style="margin-top:10px">${pill("none")} No tides at the watch level in the next ${days.length} days.</div>`;}
+      body+= w.length?`<ul style="margin-top:10px">${w.map(d=>`<li>${pill("minor").replace("Minor","Watch")}<span class="when">${fmtDay(d.t)} · forecast ${d.fc.toFixed(1)} ft${d.wx!=null&&Math.abs(d.wx)>=0.05?` (weather ${f1(d.wx)})`:""} · ~${fmtTime(new Date(d.t.getTime()+35*60e3))}</span></li>`).join("")}</ul>`:`<div class="hint" style="margin-top:10px">${pill("none")} No tides at the watch level in the next ${days.length} days.</div>`;}
   } else {
     const loc={minor:s.minor,moderate:s.moderate??Infinity,major:s.major??Infinity};
     body=`<div class="thr"><div>${pill("minor")}<b>${s.minor.toFixed(1)} ft</b></div><div>${pill("moderate")}<b>${s.moderate!=null?s.moderate.toFixed(1)+" ft":"—"}</b></div><div>${pill("major")}<b>${s.major!=null?s.major.toFixed(1)+" ft":"—"}</b></div></div>`;
     if(days){const hits=days.map(d=>({d,lv:levelOf(loc,d.fc)})).filter(x=>x.lv!=="none");
-      body+= hits.length?`<ul>${hits.map(x=>`<li>${pill(x.lv)}<span class="when">${fmtDay(x.d.t)} · forecast ${x.d.fc.toFixed(1)} ft · ~${fmtTime(new Date(x.d.t.getTime()+35*60e3))}</span></li>`).join("")}</ul>`:`<div class="hint">${pill("none")} No flood tides in the next ${days.length} days.</div>`;}
+      body+= hits.length?`<ul>${hits.map(x=>`<li>${pill(x.lv)}<span class="when">${fmtDay(x.d.t)} · forecast ${x.d.fc.toFixed(1)} ft${x.d.wx!=null&&Math.abs(x.d.wx)>=0.05?` (weather ${f1(x.d.wx)})`:""} · ~${fmtTime(new Date(x.d.t.getTime()+35*60e3))}</span></li>`).join("")}</ul>`:`<div class="hint">${pill("none")} No flood tides in the next ${days.length} days.</div>`;}
     else body+='<div class="hint">Loading tides…</div>';
   }
   const note = s.note? `<div class="note">${s.note}.</div>` : (s.kind==="model"?`<div class="note">Estimated from 1-meter lidar and SFEI shoreline data; not yet checked against what residents see. Minor = first water on the street, moderate = about 40% of it wet, major = 40% under 6+ inches.</div>`:"");
@@ -282,6 +286,23 @@ document.getElementById("street").addEventListener("input",renderStreet);
 document.getElementById("street").addEventListener("change",renderStreet);
 document.getElementById("streetClear").onclick=()=>{document.getElementById("street").value="";try{localStorage.removeItem("street")}catch(e){};renderStreet();};
 
+async function applyWeather(lastHighs){
+  const q=new URLSearchParams({latitude:WX.lat,longitude:WX.lon,hourly:"pressure_msl,wind_speed_10m,wind_direction_10m",wind_speed_unit:"ms",past_days:7,forecast_days:16,timezone:"GMT"});
+  const r=await fetch("https://api.open-meteo.com/v1/forecast?"+q); if(!r.ok) throw new Error("weather "+r.status);
+  const h=(await r.json()).hourly; const now=STATE.now.getTime();
+  const T=h.time.map(t=>Date.parse(t+":00Z")), P=h.pressure_msl, S=h.wind_speed_10m, D=h.wind_direction_10m;
+  const tu=S.map((s,i)=>s==null||D[i]==null?null:-s*Math.sin(D[i]*Math.PI/180)*s), tv=S.map((s,i)=>s==null||D[i]==null?null:-s*Math.cos(D[i]*Math.PI/180)*s);
+  const m12=a=>a.map((_,i)=>{const w=a.slice(Math.max(0,i-11),i+1).filter(v=>v!=null);return w.length?w.reduce((x,y)=>x+y,0)/w.length:null;});
+  const tu12=m12(tu), tv12=m12(tv);
+  const past=P.filter((p,i)=>p!=null&&T[i]<=now); if(past.length<48) throw new Error("not enough weather history");
+  const Pbar=past.reduce((a,b)=>a+b,0)/past.length;
+  const W=i=>(P[i]==null||tu12[i]==null)?null:(WX.cp*(P[i]-Pbar)+WX.cu*tu12[i]+WX.cv*tv12[i])/30.48;
+  const at=t=>{const i=Math.round((t-T[0])/3600e3);return i>=0&&i<T.length?W(i):null;};
+  const wn=lastHighs.map(at).filter(v=>v!=null); const wNow=wn.length?wn.reduce((a,b)=>a+b,0)/wn.length:0;
+  const base=STATE.anomaly-wNow, tEnd=T[T.length-1];
+  for(const d of STATE.allDays){ const w=d.t.getTime()<=tEnd?at(d.t.getTime()):null; d.wx=w; d.fc=d.pred+base+(w??0); }
+  STATE.wx={now:wNow,base,end:new Date(tEnd),Pbar};
+}
 async function load(){
   const now=new Date();
   const start=new Date(now); start.setHours(0,0,0,0);
@@ -312,8 +333,9 @@ async function load(){
     const v=+h.v; if(!byDay.has(k)||byDay.get(k).pred<v) byDay.set(k,{t,pred:v}); }
   const days=[...byDay.values()].sort((a,b)=>a.t-b.t).slice(0,MAXDAYS).map(d=>({...d,fc:d.pred+anomaly}));
   // trend (non-blocking)
-  STATE={now,anomaly,anomMethod,n,lastT,lastObs,allDays:days,days:days.slice(0,DAYS),trend:null};
+  STATE={now,anomaly,anomMethod,n,lastT,lastObs,allDays:days,days:days.slice(0,DAYS),trend:null,wx:null};
   render();
+  try{ await applyWeather(highs.slice(-2)); render(); }catch(e){ STATE.wxErr=e.message; render(); }
   try{
     const trend=await Promise.all(TREND_STATIONS.map(async st=>{
       const [o,p]=await Promise.all([
@@ -339,8 +361,8 @@ function render(){
   const worst=days.reduce((a,b)=>b.fc>a.fc?b:a,days[0]);
   const flagged=days.filter(d=>LOCATIONS.some(l=>levelOf(l,d.fc)!=="none")).length;
   document.getElementById("hero").innerHTML=`
-    <div class="card stat"><div class="label">Current anomaly (Kelvin wave + weather)</div><div class="value">${f1(anomaly)} ft</div><div class="note">Above NOAA's prediction at SF, measured ${STATE.anomMethod}</div></div>
-    <div class="card stat"><div class="label">Highest forecast tide, next ${DAYS} days</div><div class="value">${worst.fc.toFixed(1)} ft</div><div class="note">${fmtDay(worst.t)}, about ${fmtTime(worst.t)} at SF (predicted ${worst.pred.toFixed(1)} + anomaly)</div></div>
+    <div class="card stat"><div class="label">Current anomaly (Kelvin wave + weather)</div><div class="value">${f1(anomaly)} ft</div><div class="note">Above NOAA's prediction at SF, measured ${STATE.anomMethod}.${STATE.wx?` Weather (pressure + wind) accounts for ${f1(STATE.wx.now)} ft of it; the underlying Kelvin-wave level is ${f1(STATE.wx.base)} ft.`:""}</div></div>
+    <div class="card stat"><div class="label">Highest forecast tide, next ${DAYS} days</div><div class="value">${worst.fc.toFixed(1)} ft</div><div class="note">${fmtDay(worst.t)}, about ${fmtTime(worst.t)} at SF (predicted ${worst.pred.toFixed(1)} ${STATE.wx?`+ ${STATE.wx.base.toFixed(1)} sea-level anomaly ${worst.wx!=null?(worst.wx>=0?"+ ":"− ")+Math.abs(worst.wx).toFixed(1)+" weather":"+ average weather"}`:"+ anomaly"})</div></div>
     <div class="card stat"><div class="label">Days with flooding somewhere</div><div class="value">${flagged} of ${days.length}</div><div class="note">At least minor flooding at one of the four locations</div></div>`;
   // alerts
   document.getElementById("alerts").innerHTML=LOCATIONS.map(loc=>{
@@ -366,7 +388,7 @@ function render(){
     const html=`<b>${loc.name}</b><div style="color:var(--ink2);margin-bottom:4px">${fmtDay(d.t)} · local high ~${fmtTime(new Date(d.t.getTime()+loc.offsetMin*60e3))}</div>
       <div class="row"><span>Forecast (SF scale)</span><b>${d.fc.toFixed(2)} ft</b></div>
       <div class="row"><span>NOAA prediction</span><span>${d.pred.toFixed(2)} ft</span></div>
-      <div class="row"><span>Anomaly</span><span>${f1(anomaly)} ft</span></div>
+      ${STATE.wx?`<div class="row"><span>Sea-level anomaly</span><span>${f1(STATE.wx.base)} ft</span></div><div class="row"><span>Weather (pressure + wind)</span><span>${d.wx!=null?f1(d.wx)+" ft":"beyond forecast"}</span></div>`:`<div class="row"><span>Anomaly</span><span>${f1(anomaly)} ft</span></div>`}
       <div style="margin-top:6px">${pill(lv)}</div>${lv!=="none"?`<div style="margin-top:4px;color:var(--ink2)">${loc.notes[lv]}</div>`:""}`;
     const show=e=>{const r=td.getBoundingClientRect();showTip(html,e.clientX??r.right,e.clientY??r.bottom);};
     td.addEventListener("mousemove",show); td.addEventListener("mouseleave",hideTip);
@@ -407,6 +429,7 @@ function drawPeak(){
     showTip(`<b>${fmtDay(d.t)}</b> · SF high ~${fmtTime(d.t)}
       <div class="row"><span><i class="sw" style="background:${cssv('--s1')}"></i>Forecast</span><b>${d.fc.toFixed(2)} ft</b></div>
       <div class="row"><span><i class="sw" style="background:${cssv('--muted')}"></i>Prediction</span><span>${d.pred.toFixed(2)} ft</span></div>
+      ${STATE.wx?`<div class="row"><span>Weather</span><span>${d.wx!=null?f1(d.wx)+" ft":"beyond forecast"}</span></div>`:""}
       <div class="row"><span>Range</span><span>${(d.fc-UNCERT).toFixed(1)}–${(d.fc+UNCERT).toFixed(1)} ft</span></div>
       ${hits.length?`<div style="margin-top:6px;display:grid;gap:3px">${hits.map(([l,lv])=>`<div>${pill(lv)} ${l.name}</div>`).join("")}</div>`:`<div style="margin-top:6px;color:var(--ink2)">No flooding expected at the four locations</div>`}`,e.clientX,e.clientY);};
   hit.addEventListener("mousemove",mv); hit.addEventListener("mouseleave",()=>{hideTip();xl.setAttribute("opacity",0);});
