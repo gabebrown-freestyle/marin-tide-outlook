@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marin King Tide Outlook</title>
+<meta name="description" content="Two-week flood outlook for four flood-prone Marin streets: NOAA tide predictions plus the current Kelvin-wave sea-level anomaly, compared against flood thresholds calibrated from resident photos.">
+<style>
+:root{
+  color-scheme: light;
+  --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#6f6e69;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --none-bg:#f0efec; --none-ink:#52514e;
+  --minor:#fab219; --minor-ink:#0b0b0b;
+  --moderate:#ec835a; --moderate-ink:#0b0b0b;
+  --major:#d03b3b; --major-ink:#ffffff;
+  --band:rgba(42,120,214,.14);
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#9a9890;
+    --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+    --none-bg:#262624; --none-ink:#c3c2b7; --band:rgba(57,135,229,.20);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#9a9890;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+  --none-bg:#262624; --none-ink:#c3c2b7; --band:rgba(57,135,229,.20);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--page);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.45}
+main{max-width:1080px;margin:0 auto;padding:28px 16px 64px}
+header h1{font-size:28px;line-height:1.15;margin:0 0 6px;letter-spacing:-.01em}
+header p{margin:0;color:var(--ink2);max-width:62ch}
+.meta{font-size:13px;color:var(--muted);margin-top:8px}
+section{margin-top:28px}
+h2{font-size:17px;margin:0 0 4px}
+.sub{font-size:14px;color:var(--ink2);margin:0 0 14px;max-width:70ch}
+.card{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:18px}
+.hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.stat .label{font-size:13px;color:var(--ink2)}
+.stat .value{font-size:34px;font-weight:650;letter-spacing:-.02em;margin-top:2px}
+.stat .note{font-size:13px;color:var(--muted);margin-top:2px}
+.alerts{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.loc h3{margin:0;font-size:15px}
+.loc .where{font-size:12.5px;color:var(--muted);margin:2px 0 10px}
+.loc ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.loc li{display:flex;gap:8px;align-items:center;font-size:13.5px}
+.loc li .when{color:var(--ink2);font-variant-numeric:tabular-nums}
+.loc .clear{font-size:13.5px;color:var(--ink2)}
+.pill{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:1px 8px 1px 6px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill svg{width:12px;height:12px}
+.lv-none{background:var(--none-bg);color:var(--none-ink)}
+.lv-minor{background:var(--minor);color:var(--minor-ink)}
+.lv-moderate{background:var(--moderate);color:var(--moderate-ink)}
+.lv-major{background:var(--major);color:var(--major-ink)}
+.gridwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.outlook{border-collapse:separate;border-spacing:2px;width:100%;min-width:760px;font-size:12.5px}
+table.outlook th{font-weight:600;color:var(--ink2);text-align:center;padding:4px 2px;font-variant-numeric:tabular-nums}
+table.outlook th.rowh{text-align:left;color:var(--ink);padding-right:8px;white-space:nowrap;position:sticky;left:0;background:var(--surface);z-index:1}
+table.outlook td{height:44px;border-radius:6px;text-align:center;vertical-align:middle;cursor:default;font-variant-numeric:tabular-nums;line-height:1.1}
+table.outlook td small{display:block;font-size:10.5px;opacity:.85}
+table.outlook td:focus{outline:2px solid var(--s1);outline-offset:1px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:12px;font-size:12.5px;color:var(--ink2);align-items:center}
+.chart{position:relative}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{fill:var(--muted);font-size:11px;font-family:inherit}
+.tip{position:absolute;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--ring);box-shadow:0 4px 16px rgba(0,0,0,.12);border-radius:8px;padding:8px 10px;font-size:12.5px;min-width:150px;opacity:0;transition:opacity .08s;z-index:5}
+.tip b{font-weight:600}
+.tip .row{display:flex;justify-content:space-between;gap:12px;font-variant-numeric:tabular-nums}
+.tip .sw{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.keyrow{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--ink2);margin:0 0 8px}
+.keyrow span{display:inline-flex;align-items:center;gap:6px}
+.keyrow i{display:inline-block;width:14px;height:3px;border-radius:2px}
+details{margin-top:10px}
+details summary{cursor:pointer;color:var(--ink2);font-size:13px}
+.datatable{border-collapse:collapse;font-size:12.5px;margin-top:8px;font-variant-numeric:tabular-nums}
+.datatable th,.datatable td{border-bottom:1px solid var(--grid);padding:4px 10px;text-align:right}
+.datatable th:first-child,.datatable td:first-child{text-align:left}
+.method{font-size:14px;color:var(--ink2);max-width:72ch}
+.method li{margin:4px 0}
+.err{background:var(--surface);border:1px solid var(--major);border-radius:10px;padding:12px 14px;color:var(--ink)}
+.skeleton{color:var(--muted);font-size:14px}
+a{color:var(--s1)}
+.seg{float:right;display:flex;border:1px solid var(--ring);border-radius:999px;overflow:hidden;margin-top:-2px}.seg button{font:inherit;font-size:12.5px;border:0;background:var(--surface);color:var(--ink2);padding:4px 12px;cursor:pointer}.seg button[aria-pressed="true"]{background:var(--s1);color:#fff}
+.toggle{float:right;font:inherit;font-size:12.5px;background:var(--surface);color:var(--ink2);border:1px solid var(--ring);border-radius:999px;padding:4px 10px;cursor:pointer}
+@media (max-width:560px){header h1{font-size:23px}.stat .value{font-size:28px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <button class="toggle" id="themeBtn" type="button" aria-label="Toggle dark mode">Theme</button>
+  <h1>Marin King Tide Outlook</h1>
+  <p>Flood outlook for four Marin streets that flood on big tides. It adds this fall's El Niño sea-level bump (the Kelvin wave) to NOAA's tide predictions, then checks the result against flood thresholds set from resident photos.</p>
+  <div class="meta" id="meta">Loading live NOAA data…</div>
+</header>
+
+<section id="nowSec">
+  <div class="hero" id="hero"><div class="card skeleton">Fetching the San Francisco gauge…</div></div>
+</section>
+
+<section>
+  <h2>Next flood tides by location</h2>
+  <p class="sub">The highest tide each day, with the local high time. Storm surge is not included, so a storm on any of these days adds more water.</p>
+  <div class="alerts" id="alerts"></div>
+</section>
+
+<section>
+  <div class="seg" role="group" aria-label="Outlook length"><button type="button" data-d="14" aria-pressed="true">14 days</button><button type="button" data-d="30" aria-pressed="false">30 days</button></div>
+  <h2 id="gridTitle">14-day outlook</h2>
+  <p class="sub">Each cell is that day's highest tide at the San Francisco gauge with the current anomaly added. The color is the flood level at that location. Hover or tap a cell for details. Beyond about two weeks, treat it as a rough guide: the anomaly can grow or fade.</p>
+  <div class="card">
+    <div class="gridwrap"><table class="outlook" id="grid" aria-label="14-day flood outlook by location"></table></div>
+    <div class="legend" id="legend"></div>
+  </div>
+</section>
+
+<section>
+  <h2>Daily high tide forecast</h2>
+  <p class="sub">The highest tide each day at the San Francisco gauge: NOAA's prediction, and the forecast with today's anomaly added. The shaded band is ±0.25 ft of uncertainty in the anomaly.</p>
+  <div class="card">
+    <div class="keyrow"><span><i style="background:var(--s1)"></i>Forecast (prediction + anomaly)</span><span><i style="background:var(--muted)"></i>NOAA prediction only</span></div>
+    <div class="chart" id="peakChart"></div>
+    <details><summary>Show as table</summary><div id="peakTable"></div></details>
+  </div>
+</section>
+
+<section>
+  <h2>Kelvin wave watch: anomaly along the coast</h2>
+  <p class="sub">Daily average of the measured water level minus the predicted tide over the last three weeks. Slow buildups tend to show up in San Diego first and reach San Francisco about three days later. Storm spikes don't follow that pattern.</p>
+  <div class="card">
+    <div class="keyrow" id="trendKey"></div>
+    <div class="chart" id="trendChart"></div>
+    <details><summary>Show as table</summary><div id="trendTable"></div></details>
+  </div>
+</section>
+
+<section>
+  <h2>How this works, and its limits</h2>
+  <ul class="method">
+    <li><b>Tide:</b> NOAA's hourly predictions for the San Francisco gauge (9414290), in feet above mean lower low water. All thresholds use that same scale.</li>
+    <li><b>Anomaly:</b> measured minus predicted water level at San Francisco, averaged over the hour either side of the last two high tides (or the last 25 hours if that's unavailable). It's carried forward unchanged, which holds well for slow Kelvin wave buildups but says nothing about storms.</li>
+    <li><b>Thresholds:</b> each street's flood lines come from a 1-meter lidar flood model, SFEI's Bay shoreline data, resident photos (Jan 1–3, 2026 and Oct 27–29, 2026) and the WET app's flood lines. They are estimates. Pump stations, storm drains and rain all shift them.</li>
+    <li><b>Not included:</b> storm surge, wind and rain. During a storm, check the <a href="https://www.weather.gov/mtr/">NWS Bay Area coastal flood advisories</a>.</li>
+    <li>This is a community project, not an official warning. Don't drive through floodwater.</li>
+  </ul>
+</section>
+</main>
+
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+/* ===================== CONFIG: edit thresholds here ===================== */
+// All levels are feet above MLLW on the San Francisco gauge (9414290) scale.
+// offsetMin = minutes the local high tide lags the SF high tide.
+const LOCATIONS = [
+  { id:"goldenhind", name:"Golden Hind Passage", where:"Mariner Cove, Corte Madera", offsetMin:35,
+    minor:7.6, moderate:7.9, major:8.4,
+    notes:{minor:"Water in the street at the north end", moderate:"Curb to curb, up driveways", major:"Garages at risk"} },
+  { id:"ptsanpedro", name:"Point San Pedro Rd", where:"By the Marin Yacht Club, San Rafael", offsetMin:30,
+    minor:7.6, moderate:8.2, major:8.7,
+    notes:{minor:"Low spots on the creek side", moderate:"Much of the stretch underwater", major:"Road likely impassable"} },
+  { id:"riviera", name:"Riviera Circle", where:"Larkspur, along Corte Madera Creek", offsetMin:35,
+    minor:7.4, moderate:7.8, major:8.3,
+    notes:{minor:"Low streets start flooding", moderate:"Widespread street flooding", major:"Deep, widespread flooding"} },
+  { id:"lucky", name:"Lucky Drive", where:"Corte Madera / Larkspur, by Hwy 101", offsetMin:40,
+    minor:6.9, moderate:7.85, major:8.0,
+    notes:{minor:"Some water, pumps usually keep up", moderate:"Significant water on the road", major:"Deep flooding, avoid"} },
+];
+const SF="9414290";
+const TREND_STATIONS=[{id:"9410170",name:"San Diego"},{id:"9412110",name:"Port San Luis"},{id:"9413450",name:"Monterey"},{id:"9414290",name:"San Francisco"}];
+const UNCERT=0.25, MAXDAYS=31; let DAYS=30;
+/* ======================================================================= */
+
+const API="https://api.tidesandcurrents.noaa.gov/api/prod/datagetter";
+const pad=n=>String(n).padStart(2,"0");
+const ymd=d=>`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+const ymdhm=d=>`${ymd(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const parseT=s=>{const [a,b]=s.split(" ");const [y,m,d]=a.split("-").map(Number);const [h,mi]=b.split(":").map(Number);return new Date(y,m-1,d,h,mi);};
+const fmtDay=d=>d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+const fmtTime=d=>d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+const f1=v=>(v>=0?"+":"")+v.toFixed(1);
+async function noaa(params){
+  const q=new URLSearchParams({datum:"MLLW",units:"english",time_zone:"lst_ldt",format:"json",application:"marin_tide_outlook",...params});
+  const r=await fetch(`${API}?${q}`); if(!r.ok) throw new Error(`NOAA ${r.status}`);
+  const j=await r.json(); if(j.error) throw new Error(j.error.message||"NOAA error");
+  return j;
+}
+const LEVELS=["none","minor","moderate","major"];
+const LABEL={none:"No flooding",minor:"Minor",moderate:"Moderate",major:"Major"};
+const ICON={
+  none:'<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="2.5" fill="currentColor"/></svg>',
+  minor:'<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5 C8 4.5 9.5 6.2 9.5 7.8 A3.5 3.5 0 0 1 2.5 7.8 C2.5 6.2 4 4.5 6 1.5Z" fill="currentColor"/></svg>',
+  moderate:'<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1 5 q2.5 -2 5 0 t5 0 M1 9 q2.5 -2 5 0 t5 0" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>',
+  major:'<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1 L11.5 10.5 H0.5Z" fill="currentColor"/><rect x="5.25" y="4.2" width="1.5" height="3.4" fill="var(--major)"/><rect x="5.25" y="8.3" width="1.5" height="1.4" fill="var(--major)"/></svg>'
+};
+const levelOf=(loc,v)=>v>=loc.major?"major":v>=loc.moderate?"moderate":v>=loc.minor?"minor":"none";
+const pill=lv=>`<span class="pill lv-${lv}">${ICON[lv]}${LABEL[lv]}</span>`;
+
+const tip=document.getElementById("tip");
+function showTip(html,x,y){tip.innerHTML=html;tip.style.opacity=1;const r=tip.getBoundingClientRect();
+  let left=x+14, top=y+14; if(left+r.width>innerWidth-8) left=x-r.width-14; if(top+r.height>innerHeight-8) top=y-r.height-14;
+  tip.style.left=(left+scrollX)+"px"; tip.style.top=(top+scrollY)+"px";}
+function hideTip(){tip.style.opacity=0;}
+
+/* theme toggle */
+(function(){const b=document.getElementById("themeBtn");let t=null;try{t=localStorage.getItem("theme")}catch(e){}
+ if(t) document.documentElement.dataset.theme=t;
+ b.onclick=()=>{const cur=document.documentElement.dataset.theme||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
+  const n=cur==="dark"?"light":"dark";document.documentElement.dataset.theme=n;try{localStorage.setItem("theme",n)}catch(e){};render();};})();
+
+let STATE=null;
+
+async function load(){
+  const now=new Date();
+  const start=new Date(now); start.setHours(0,0,0,0);
+  const end=new Date(start); end.setDate(end.getDate()+MAXDAYS);
+  const back=new Date(now.getTime()-26*3600e3);
+  const tBack=new Date(now.getTime()-21*86400e3);
+  const [hilo,obs,pred]=await Promise.all([
+    noaa({product:"predictions",interval:"hilo",station:SF,begin_date:ymd(start),end_date:ymd(end)}),
+    noaa({product:"water_level",station:SF,begin_date:ymdhm(back),end_date:ymdhm(now)}),
+    noaa({product:"predictions",interval:"6",station:SF,begin_date:ymdhm(back),end_date:ymdhm(now)}),
+  ]);
+  // anomaly: measured minus predicted around the last two high tides (+/-60 min); fallback 25 h mean
+  const pm=new Map(pred.predictions.map(p=>[p.t,+p.v]));
+  const pts=[]; let lastT=null,lastObs=null;
+  for(const o of obs.data){ if(o.v==="") continue; const t=parseT(o.t); const p=pm.get(o.t);
+    if(p!==undefined) pts.push({t:t.getTime(),r:(+o.v)-p}); lastT=t; lastObs=+o.v; }
+  if(pts.length<100) throw new Error("Not enough recent gauge data to compute the anomaly");
+  const pa=pred.predictions.map(p=>({t:parseT(p.t).getTime(),v:+p.v}));
+  const highs=[]; for(let i=5;i<pa.length-5;i++){ if(pa[i].v>=Math.max(...pa.slice(i-5,i+6).map(q=>q.v)) && pa[i].t<=now.getTime()-30*60e3) highs.push(pa[i].t); }
+  const near=pts.filter(p=>highs.slice(-2).some(h=>Math.abs(p.t-h)<=60*60e3));
+  const cut=now.getTime()-24.84*3600e3, day=pts.filter(p=>p.t>=cut);
+  const mean=a=>a.reduce((x,y)=>x+y.r,0)/a.length;
+  const anomaly=near.length>=20?mean(near):mean(day); const anomMethod=near.length>=20?"at the last two high tides":"25-hour average";
+  const n=near.length;
+  // daily peaks
+  const byDay=new Map();
+  for(const h of hilo.predictions){ if(h.type!=="H") continue; const t=parseT(h.t); const k=t.toDateString();
+    const v=+h.v; if(!byDay.has(k)||byDay.get(k).pred<v) byDay.set(k,{t,pred:v}); }
+  const days=[...byDay.values()].sort((a,b)=>a.t-b.t).slice(0,MAXDAYS).map(d=>({...d,fc:d.pred+anomaly}));
+  // trend (non-blocking)
+  STATE={now,anomaly,anomMethod,n,lastT,lastObs,allDays:days,days:days.slice(0,DAYS),trend:null};
+  render();
+  try{
+    const trend=await Promise.all(TREND_STATIONS.map(async st=>{
+      const [o,p]=await Promise.all([
+        noaa({product:"water_level",station:st.id,begin_date:ymdhm(tBack),end_date:ymdhm(now)}),
+        noaa({product:"predictions",interval:"6",station:st.id,begin_date:ymdhm(tBack),end_date:ymdhm(now)})]);
+      const pmap=new Map(p.predictions.map(x=>[x.t,+x.v])); const agg=new Map();
+      for(const x of o.data){ if(x.v==="") continue; const pv=pmap.get(x.t); if(pv===undefined) continue;
+        const k=x.t.slice(0,10); const a=agg.get(k)||{s:0,n:0}; a.s+=(+x.v)-pv; a.n++; agg.set(k,a); }
+      const pts=[...agg.entries()].filter(([,a])=>a.n>=200).map(([k,a])=>({d:parseT(k+" 12:00"),v:a.s/a.n})).sort((a,b)=>a.d-b.d);
+      return {...st,pts};
+    }));
+    STATE.trend=trend; render();
+  }catch(e){ STATE.trendErr=e.message; render(); }
+}
+
+function render(){
+  if(!STATE) return;
+  STATE.days=STATE.allDays.slice(0,DAYS); const {anomaly,days,lastT,lastObs,now}=STATE;
+  document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.d===DAYS));
+  document.getElementById('gridTitle').textContent=`${DAYS}-day outlook`;
+  document.getElementById("meta").textContent=`Live from NOAA · San Francisco gauge last reading ${lastObs.toFixed(2)} ft at ${fmtTime(lastT)} · page loaded ${now.toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}`;
+  // hero
+  const worst=days.reduce((a,b)=>b.fc>a.fc?b:a,days[0]);
+  const flagged=days.filter(d=>LOCATIONS.some(l=>levelOf(l,d.fc)!=="none")).length;
+  document.getElementById("hero").innerHTML=`
+    <div class="card stat"><div class="label">Current anomaly (Kelvin wave + weather)</div><div class="value">${f1(anomaly)} ft</div><div class="note">Above NOAA's prediction at SF, measured ${STATE.anomMethod}</div></div>
+    <div class="card stat"><div class="label">Highest forecast tide, next ${DAYS} days</div><div class="value">${worst.fc.toFixed(1)} ft</div><div class="note">${fmtDay(worst.t)}, about ${fmtTime(worst.t)} at SF (predicted ${worst.pred.toFixed(1)} + anomaly)</div></div>
+    <div class="card stat"><div class="label">Days with flooding somewhere</div><div class="value">${flagged} of ${days.length}</div><div class="note">At least minor flooding at one of the four locations</div></div>`;
+  // alerts
+  document.getElementById("alerts").innerHTML=LOCATIONS.map(loc=>{
+    const hits=days.map(d=>({d,lv:levelOf(loc,d.fc)})).filter(x=>x.lv!=="none");
+    const local=t=>new Date(t.getTime()+loc.offsetMin*60e3);
+    const rank=lv=>LEVELS.indexOf(lv);
+    const top=hits.slice().sort((p,q)=>rank(q.lv)-rank(p.lv)||q.d.fc-p.d.fc).slice(0,6).sort((p,q)=>p.d.t-q.d.t);
+    const list=hits.length?`<ul>${top.map(x=>`<li>${pill(x.lv)}<span class="when">${fmtDay(x.d.t)} · ~${fmtTime(local(x.d.t))}</span></li>`).join("")}${hits.length>6?`<li class="when">Showing the ${top.length} worst of ${hits.length} flood days</li>`:""}</ul>`
+      :`<div class="clear">${pill("none")} No flood tides in the next ${DAYS} days.</div>`;
+    return `<div class="card loc"><h3>${loc.name}</h3><div class="where">${loc.where} · minor ${loc.minor} / moderate ${loc.moderate} / major ${loc.major} ft</div>${list}</div>`;}).join("");
+  // grid
+  const g=document.getElementById("grid");
+  let h=`<thead><tr><th class="rowh" scope="col">Location</th>${days.map(d=>`<th scope="col">${d.t.toLocaleDateString("en-US",{weekday:"short"})}<br>${d.t.getMonth()+1}/${d.t.getDate()}</th>`).join("")}</tr></thead><tbody>`;
+  for(const loc of LOCATIONS){
+    h+=`<tr><th class="rowh" scope="row">${loc.name}</th>`;
+    days.forEach((d,i)=>{const lv=levelOf(loc,d.fc);
+      h+=`<td class="lv-${lv}" tabindex="0" data-l="${loc.id}" data-i="${i}" aria-label="${loc.name}, ${fmtDay(d.t)}: ${LABEL[lv]}, forecast ${d.fc.toFixed(1)} ft">${lv==="none"?"–":ICON[lv].replace('aria-hidden="true"','aria-hidden="true" style="width:12px;height:12px"')}<small>${d.fc.toFixed(1)}</small></td>`;});
+    h+=`</tr>`;
+  }
+  g.innerHTML=h+"</tbody>";
+  g.querySelectorAll("td").forEach(td=>{
+    const loc=LOCATIONS.find(l=>l.id===td.dataset.l), d=days[+td.dataset.i], lv=levelOf(loc,d.fc);
+    const html=`<b>${loc.name}</b><div style="color:var(--ink2);margin-bottom:4px">${fmtDay(d.t)} · local high ~${fmtTime(new Date(d.t.getTime()+loc.offsetMin*60e3))}</div>
+      <div class="row"><span>Forecast (SF scale)</span><b>${d.fc.toFixed(2)} ft</b></div>
+      <div class="row"><span>NOAA prediction</span><span>${d.pred.toFixed(2)} ft</span></div>
+      <div class="row"><span>Anomaly</span><span>${f1(anomaly)} ft</span></div>
+      <div style="margin-top:6px">${pill(lv)}</div>${lv!=="none"?`<div style="margin-top:4px;color:var(--ink2)">${loc.notes[lv]}</div>`:""}`;
+    const show=e=>{const r=td.getBoundingClientRect();showTip(html,e.clientX??r.right,e.clientY??r.bottom);};
+    td.addEventListener("mousemove",show); td.addEventListener("mouseleave",hideTip);
+    td.addEventListener("focus",()=>{const r=td.getBoundingClientRect();showTip(html,r.right,r.bottom);}); td.addEventListener("blur",hideTip);
+  });
+  document.getElementById("legend").innerHTML=LEVELS.map(lv=>pill(lv)).join("")+`<span>Number = forecast high tide, ft on the SF scale</span>`;
+  drawPeak(); drawTrend();
+}
+
+const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function svgEl(w,h){return `<svg viewBox="0 0 ${w} ${h}" role="img" preserveAspectRatio="xMidYMid meet">`;}
+function niceTicks(lo,hi,step){const out=[];for(let v=Math.ceil(lo/step)*step;v<=hi+1e-9;v+=step) out.push(+v.toFixed(2));return out;}
+
+function drawPeak(){
+  const {days,anomaly}=STATE; const el=document.getElementById("peakChart");
+  const W=Math.max(320,el.clientWidth||900), H=280, m={l:40,r:12,t:12,b:34};
+  const lo=Math.floor(Math.min(...days.map(d=>d.pred))-0.3), hi=Math.ceil(Math.max(...days.map(d=>d.fc+UNCERT))+0.2);
+  const x=i=>m.l+(i+0.5)*(W-m.l-m.r)/days.length, y=v=>m.t+(hi-v)/(hi-lo)*(H-m.t-m.b);
+  let s=svgEl(W,H)+`<title>Daily highest tide at San Francisco, forecast vs prediction</title>`;
+  for(const v of niceTicks(lo,hi,0.5)) s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="${cssv('--grid')}" stroke-width="1"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end">${v.toFixed(1)}</text>`;
+  s+=`<text x="${m.l}" y="${m.t-2}" text-anchor="start" style="font-size:10.5px">ft (SF)</text>`;
+  const band=days.map((d,i)=>`${x(i)},${y(d.fc+UNCERT)}`).join(" ")+" "+days.slice().reverse().map((d,j)=>`${x(days.length-1-j)},${y(d.fc-UNCERT)}`).join(" ");
+  s+=`<polygon points="${band}" fill="${cssv('--band')}"/>`;
+  s+=`<polyline points="${days.map((d,i)=>`${x(i)},${y(d.pred)}`).join(" ")}" fill="none" stroke="${cssv('--muted')}" stroke-width="2" stroke-dasharray="4 4" stroke-linejoin="round"/>`;
+  s+=`<polyline points="${days.map((d,i)=>`${x(i)},${y(d.fc)}`).join(" ")}" fill="none" stroke="${cssv('--s1')}" stroke-width="2" stroke-linejoin="round"/>`;
+  days.forEach((d,i)=>{s+=`<circle cx="${x(i)}" cy="${y(d.fc)}" r="4" fill="${cssv('--s1')}" stroke="${cssv('--surface')}" stroke-width="2"/>`;
+    if(i%Math.ceil(days.length/(W<600?5:10))===0) s+=`<text x="${x(i)}" y="${H-m.b+16}" text-anchor="middle">${d.t.getMonth()+1}/${d.t.getDate()}</text>`;});
+  const wi=days.reduce((a,d,i)=>d.fc>days[a].fc?i:a,0);
+  s+=`<text x="${x(wi)}" y="${y(days[wi].fc+UNCERT)-6}" text-anchor="middle" style="fill:${cssv('--ink')};font-weight:600">${days[wi].fc.toFixed(1)}</text>`;
+  s+=`<line id="pk-x" x1="0" x2="0" y1="${m.t}" y2="${H-m.b}" stroke="${cssv('--axis')}" stroke-width="1" opacity="0"/>`;
+  s+=`<rect x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="transparent" id="pk-hit"/></svg>`;
+  el.innerHTML=s;
+  const svg=el.querySelector("svg"), hit=el.querySelector("#pk-hit"), xl=el.querySelector("#pk-x");
+  const mv=e=>{const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(svg.getScreenCTM().inverse());
+    const i=Math.max(0,Math.min(days.length-1,Math.floor((q.x-m.l)/((W-m.l-m.r)/days.length)))); const d=days[i];
+    xl.setAttribute("x1",x(i));xl.setAttribute("x2",x(i));xl.setAttribute("opacity",1);
+    const hits=LOCATIONS.map(l=>[l,levelOf(l,d.fc)]).filter(([,lv])=>lv!=="none");
+    showTip(`<b>${fmtDay(d.t)}</b> · SF high ~${fmtTime(d.t)}
+      <div class="row"><span><i class="sw" style="background:${cssv('--s1')}"></i>Forecast</span><b>${d.fc.toFixed(2)} ft</b></div>
+      <div class="row"><span><i class="sw" style="background:${cssv('--muted')}"></i>Prediction</span><span>${d.pred.toFixed(2)} ft</span></div>
+      <div class="row"><span>Range</span><span>${(d.fc-UNCERT).toFixed(1)}–${(d.fc+UNCERT).toFixed(1)} ft</span></div>
+      ${hits.length?`<div style="margin-top:6px;display:grid;gap:3px">${hits.map(([l,lv])=>`<div>${pill(lv)} ${l.name}</div>`).join("")}</div>`:`<div style="margin-top:6px;color:var(--ink2)">No flooding expected at the four locations</div>`}`,e.clientX,e.clientY);};
+  hit.addEventListener("mousemove",mv); hit.addEventListener("mouseleave",()=>{hideTip();xl.setAttribute("opacity",0);});
+  document.getElementById("peakTable").innerHTML=`<table class="datatable"><thead><tr><th>Day</th><th>SF high</th><th>Prediction</th><th>Forecast</th>${LOCATIONS.map(l=>`<th>${l.name}</th>`).join("")}</tr></thead><tbody>${days.map(d=>`<tr><td>${fmtDay(d.t)}</td><td>${fmtTime(d.t)}</td><td>${d.pred.toFixed(2)}</td><td>${d.fc.toFixed(2)}</td>${LOCATIONS.map(l=>`<td>${LABEL[levelOf(l,d.fc)]}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+
+function drawTrend(){
+  const el=document.getElementById("trendChart"), key=document.getElementById("trendKey");
+  const cols=["--s1","--s2","--s3","--s4"];
+  key.innerHTML=TREND_STATIONS.map((s,i)=>`<span><i style="background:var(${cols[i]})"></i>${s.name}</span>`).join("");
+  if(STATE.trendErr){el.innerHTML=`<div class="err">Couldn't load the coastal trend: ${STATE.trendErr}</div>`;return;}
+  if(!STATE.trend){el.innerHTML=`<div class="skeleton">Loading four gauges…</div>`;return;}
+  const T=STATE.trend; const all=T.flatMap(s=>s.pts); if(!all.length){el.innerHTML='<div class="skeleton">No data.</div>';return;}
+  const W=Math.max(320,el.clientWidth||900), H=280, m={l:40,r:96,t:12,b:34};
+  const t0=Math.min(...all.map(p=>p.d)), t1=Math.max(...all.map(p=>p.d));
+  const lo=Math.min(0,Math.floor(Math.min(...all.map(p=>p.v))*2)/2), hi=Math.ceil(Math.max(...all.map(p=>p.v))*2)/2;
+  const x=t=>m.l+(t-t0)/(t1-t0||1)*(W-m.l-m.r), y=v=>m.t+(hi-v)/(hi-lo||1)*(H-m.t-m.b);
+  let s=svgEl(W,H)+`<title>Daily mean sea-level anomaly at four California gauges</title>`;
+  for(const v of niceTicks(lo,hi,0.5)) s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="${cssv(v===0?'--axis':'--grid')}" stroke-width="1"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end">${f1(v)}</text>`;
+  s+=`<text x="${m.l}" y="${m.t-2}" style="font-size:10.5px">ft vs prediction</text>`;
+  for(let d=new Date(t0);d<=t1;d=new Date(d.getTime()+7*86400e3)) s+=`<text x="${x(d)}" y="${H-m.b+16}" text-anchor="middle">${d.getMonth()+1}/${d.getDate()}</text>`;
+  // label placement with collision avoidance
+  const ends=T.map((st,i)=>({i,y:st.pts.length?y(st.pts[st.pts.length-1].v):0})).sort((a,b)=>a.y-b.y);
+  for(let k=1;k<ends.length;k++) if(ends[k].y-ends[k-1].y<14) ends[k].y=ends[k-1].y+14;
+  T.forEach((st,i)=>{ if(!st.pts.length) return;
+    s+=`<polyline points="${st.pts.map(p=>`${x(p.d)},${y(p.v)}`).join(" ")}" fill="none" stroke="${cssv(cols[i])}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const lp=st.pts[st.pts.length-1], ly=ends.find(e=>e.i===i).y;
+    s+=`<circle cx="${x(lp.d)}" cy="${y(lp.v)}" r="4" fill="${cssv(cols[i])}" stroke="${cssv('--surface')}" stroke-width="2"/>`;
+    s+=`<text x="${x(lp.d)+8}" y="${ly+4}" style="fill:${cssv('--ink2')}">${st.name} ${f1(lp.v)}</text>`;});
+  s+=`<line id="tr-x" x1="0" x2="0" y1="${m.t}" y2="${H-m.b}" stroke="${cssv('--axis')}" opacity="0"/><rect id="tr-hit" x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="transparent"/></svg>`;
+  el.innerHTML=s;
+  const svg=el.querySelector("svg"), hit=el.querySelector("#tr-hit"), xl=el.querySelector("#tr-x");
+  const dates=[...new Set(all.map(p=>+p.d))].sort((a,b)=>a-b);
+  hit.addEventListener("mousemove",e=>{const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(svg.getScreenCTM().inverse());
+    const tq=t0+(q.x-m.l)/(W-m.l-m.r)*(t1-t0); const dn=dates.reduce((a,b)=>Math.abs(b-tq)<Math.abs(a-tq)?b:a,dates[0]);
+    xl.setAttribute("x1",x(dn));xl.setAttribute("x2",x(dn));xl.setAttribute("opacity",1);
+    showTip(`<b>${fmtDay(new Date(dn))}</b>${T.map((st,i)=>{const pt=st.pts.find(p=>+p.d===dn);return `<div class="row"><span><i class="sw" style="background:${cssv(cols[i])}"></i>${st.name}</span><span>${pt?f1(pt.v)+" ft":"–"}</span></div>`;}).join("")}`,e.clientX,e.clientY);});
+  hit.addEventListener("mouseleave",()=>{hideTip();xl.setAttribute("opacity",0);});
+  document.getElementById("trendTable").innerHTML=`<table class="datatable"><thead><tr><th>Day</th>${T.map(s=>`<th>${s.name}</th>`).join("")}</tr></thead><tbody>${dates.map(dn=>`<tr><td>${fmtDay(new Date(dn))}</td>${T.map(st=>{const pt=st.pts.find(p=>+p.d===dn);return `<td>${pt?f1(pt.v):"–"}</td>`}).join("")}</tr>`).join("")}</tbody></table>`;
+}
+
+document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{DAYS=+b.dataset.d;render();});
+let rz; addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{if(STATE){drawPeak();drawTrend();}},150);});
+load().catch(e=>{document.getElementById("hero").innerHTML=`<div class="err">Couldn't load NOAA data: ${e.message}. NOAA's API is sometimes briefly down; try reloading in a minute.</div>`;document.getElementById("meta").textContent="";});
+</script>
+</body>
+</html>
