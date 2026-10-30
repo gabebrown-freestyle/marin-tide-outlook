@@ -16,3 +16,8 @@ Current calibration sources: a 1 m USGS lidar flood model with SFEI Bay Shore In
 
 ## Limits
 Storm surge, wind and rain are not included. This is a community project, not an official warning.
+
+## Street lookup (`streets.json`)
+246 low-lying streets in Corte Madera, Larkspur, Greenbrae and east San Rafael. Each has minor / moderate / major flood lines in feet MLLW on the SF gauge scale.
+- Source: flood-connectivity model on 2018 USGS 3DEP 1 m lidar, with SFEI Bay Shore Inventory barriers burned in and openings/tide gates treated as closed, at 5 cm water-level steps. Minor = first ~15 m of street wet; moderate = 40% wet; major = 40% under 6+ inches.
+- `kind`: `calibrated` (resident reports/WET), `model` (±0.5 ft), `basin` (Lucky Drive pump-drained low area; uses Lucky's calibrated lines), `protected` (below ordinary high tides, dry only because of levees/pumps; shown as a watch at 8.1 ft, the level that flooded protected areas on Jan 2–3, 2026).

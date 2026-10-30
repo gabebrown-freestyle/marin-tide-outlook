@@ -89,6 +89,22 @@ details summary{cursor:pointer;color:var(--ink2);font-size:13px}
 .skeleton{color:var(--muted);font-size:14px}
 a{color:var(--s1)}
 .seg{float:right;display:flex;border:1px solid var(--ring);border-radius:999px;overflow:hidden;margin-top:-2px}.seg button{font:inherit;font-size:12.5px;border:0;background:var(--surface);color:var(--ink2);padding:4px 12px;cursor:pointer}.seg button[aria-pressed="true"]{background:var(--s1);color:#fff}
+.lbl{display:block;font-size:13px;color:var(--ink2);margin-bottom:6px}
+.searchrow{display:flex;gap:8px}
+.searchrow input{flex:1;min-width:0;font:inherit;font-size:16px;padding:10px 12px;border-radius:10px;border:1px solid var(--ring);background:var(--page);color:var(--ink)}
+.searchrow input:focus{outline:2px solid var(--s1);outline-offset:1px}
+.searchrow button{font:inherit;font-size:13px;border:1px solid var(--ring);background:var(--surface);color:var(--ink2);border-radius:10px;padding:0 12px;cursor:pointer}
+.sres{margin-top:14px}
+.sres h3{margin:0;font-size:18px}
+.sres .where{font-size:13px;color:var(--muted);margin:2px 0 10px}
+.kind{display:inline-block;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 8px;border:1px solid var(--ring);color:var(--ink2);margin-left:6px;vertical-align:2px}
+.thr{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:8px 0 12px}
+.thr div{background:var(--page);border:1px solid var(--ring);border-radius:10px;padding:8px 10px;font-size:13px}
+.thr b{display:block;font-size:20px;font-weight:650;margin-top:2px}
+.sres ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.sres li{display:flex;gap:8px;align-items:center;font-size:13.5px;flex-wrap:wrap}
+.sres .note{font-size:13px;color:var(--ink2);margin-top:10px;max-width:70ch}
+.hint{font-size:13.5px;color:var(--ink2)}
 .toggle{float:right;font:inherit;font-size:12.5px;background:var(--surface);color:var(--ink2);border:1px solid var(--ring);border-radius:999px;padding:4px 10px;cursor:pointer}
 @media (max-width:560px){header h1{font-size:23px}.stat .value{font-size:28px}}
 </style>
@@ -98,9 +114,20 @@ a{color:var(--s1)}
 <header>
   <button class="toggle" id="themeBtn" type="button" aria-label="Toggle dark mode">Theme</button>
   <h1>Marin King Tide Outlook</h1>
-  <p>Flood outlook for four Marin streets that flood on big tides. It adds this fall's El Niño sea-level bump (the Kelvin wave) to NOAA's tide predictions, then checks the result against flood thresholds set from resident photos.</p>
+  <p>Tide flood outlook for low-lying streets in Corte Madera, Larkspur and east San Rafael. It adds this fall's El Niño sea-level bump (the Kelvin wave) to NOAA's tide predictions, then checks the result against each street's flood lines, which come from lidar and, where available, resident photos.</p>
   <div class="meta" id="meta">Loading live NOAA data…</div>
 </header>
+
+<section id="lookupSec">
+  <h2>Check your street</h2>
+  <p class="sub">Covers 246 low-lying streets in Corte Madera, Larkspur, Greenbrae and east San Rafael (Canal, Bahia, Spinnaker Point, Peacock Gap). Pick a street to see its flood lines and the next tides that reach them.</p>
+  <div class="card">
+    <label for="street" class="lbl">Street</label>
+    <div class="searchrow"><input id="street" list="streetList" placeholder="Start typing, e.g. Golden Hind" autocomplete="off" spellcheck="false"><button type="button" id="streetClear" aria-label="Clear">Clear</button></div>
+    <datalist id="streetList"></datalist>
+    <div id="streetResult" class="sres"></div>
+  </div>
+</section>
 
 <section id="nowSec">
   <div class="hero" id="hero"><div class="card skeleton">Fetching the San Francisco gauge…</div></div>
@@ -147,6 +174,7 @@ a{color:var(--s1)}
   <ul class="method">
     <li><b>Tide:</b> NOAA's hourly predictions for the San Francisco gauge (9414290), in feet above mean lower low water. All thresholds use that same scale.</li>
     <li><b>Anomaly:</b> measured minus predicted water level at San Francisco, averaged over the hour either side of the last two high tides (or the last 25 hours if that's unavailable). It's carried forward unchanged, which holds well for slow Kelvin wave buildups but says nothing about storms.</li>
+    <li><b>Street lookup:</b> flood lines for 246 streets come from a flood-connectivity model on 2018 USGS 1-meter lidar with SFEI Bay Shore Inventory barriers and tide gates treated as closed, run at 5 cm water-level steps. Five streets are calibrated from resident reports; the rest are model estimates (about ±0.5 ft). "Behind levees / pumps" means the street is below ordinary high tides and stays dry only because of infrastructure.</li>
     <li><b>Thresholds:</b> each street's flood lines come from a 1-meter lidar flood model, SFEI's Bay shoreline data, resident photos (Jan 1–3, 2026 and Oct 27–29, 2026) and the WET app's flood lines. They are estimates. Pump stations, storm drains and rain all shift them.</li>
     <li><b>Not included:</b> storm surge, wind and rain. During a storm, check the <a href="https://www.weather.gov/mtr/">NWS Bay Area coastal flood advisories</a>.</li>
     <li>This is a community project, not an official warning. Don't drive through floodwater.</li>
@@ -216,7 +244,43 @@ function hideTip(){tip.style.opacity=0;}
  b.onclick=()=>{const cur=document.documentElement.dataset.theme||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
   const n=cur==="dark"?"light":"dark";document.documentElement.dataset.theme=n;try{localStorage.setItem("theme",n)}catch(e){};render();};})();
 
-let STATE=null;
+let STATE=null, STREETS=null, PROT_WATCH=8.1;
+const KIND={calibrated:"Checked against resident reports",model:"Model estimate, ±0.5 ft",basin:"Lucky Drive low area",protected:"Behind levees / pumps"};
+fetch("streets.json").then(r=>r.json()).then(j=>{STREETS=j.streets;PROT_WATCH=j.protected_watch||8.1;
+  const dl=document.getElementById("streetList"); dl.innerHTML=STREETS.map(s=>`<option value="${s.name} — ${s.town}"></option>`).join("");
+  let saved=null; try{saved=localStorage.getItem("street")}catch(e){}
+  if(saved){document.getElementById("street").value=saved;} renderStreet();}).catch(()=>{document.getElementById("streetResult").innerHTML='<div class="hint">Street list failed to load.</div>';});
+function findStreet(v){ if(!STREETS||!v) return null; const q=v.trim().toLowerCase();
+  return STREETS.find(s=>`${s.name} — ${s.town}`.toLowerCase()===q) || (STREETS.filter(s=>s.name.toLowerCase()===q).length===1?STREETS.find(s=>s.name.toLowerCase()===q):null); }
+function renderStreet(){
+  const el=document.getElementById("streetResult"); if(!el) return;
+  const v=document.getElementById("street").value; const s=findStreet(v);
+  if(!STREETS){el.innerHTML='<div class="hint">Loading streets…</div>';return;}
+  if(!s){ const q=(v||"").trim().toLowerCase(); const m=q.length>=3?STREETS.filter(x=>x.name.toLowerCase().includes(q)).slice(0,8):[];
+    el.innerHTML = m.length? `<div class="hint">Did you mean: ${m.map(x=>`<a href="#" data-s="${x.name} — ${x.town}">${x.name} (${x.town})</a>`).join(", ")}</div>`
+      : `<div class="hint">${q.length>=3?"Not in the covered area, or not low enough to flood on tides under about 10 ft. ":""}Try Golden Hind, Lucky, Riviera, Canal, Bahia or Peacock.</div>`;
+    el.querySelectorAll("a[data-s]").forEach(a=>a.onclick=e=>{e.preventDefault();document.getElementById("street").value=a.dataset.s;renderStreet();}); return; }
+  try{localStorage.setItem("street",`${s.name} — ${s.town}`)}catch(e){}
+  const map=`https://www.openstreetmap.org/?mlat=${s.lat}&mlon=${s.lon}#map=17/${s.lat}/${s.lon}`;
+  const days=STATE?STATE.allDays:null; let body="";
+  if(s.kind==="protected"){
+    body=`<div class="thr"><div>Lowest ground on the street<b>${s.low.toFixed(1)} ft</b></div><div>Watch when the SF tide forecast reaches<b>${PROT_WATCH.toFixed(1)} ft</b></div></div>
+      <div class="hint">Parts of this street sit below ordinary high tides and are kept dry by levees, tide gates or pumps. This tool can't predict when those are overwhelmed. On Jan 2–3, 2026 (8.1–8.3 ft at SF) several protected areas in Corte Madera and San Rafael flooded.</div>`;
+    if(days){const w=days.filter(d=>d.fc>=PROT_WATCH);
+      body+= w.length?`<ul style="margin-top:10px">${w.map(d=>`<li>${pill("minor").replace("Minor","Watch")}<span class="when">${fmtDay(d.t)} · forecast ${d.fc.toFixed(1)} ft · ~${fmtTime(new Date(d.t.getTime()+35*60e3))}</span></li>`).join("")}</ul>`:`<div class="hint" style="margin-top:10px">${pill("none")} No tides at the watch level in the next ${days.length} days.</div>`;}
+  } else {
+    const loc={minor:s.minor,moderate:s.moderate??Infinity,major:s.major??Infinity};
+    body=`<div class="thr"><div>${pill("minor")}<b>${s.minor.toFixed(1)} ft</b></div><div>${pill("moderate")}<b>${s.moderate!=null?s.moderate.toFixed(1)+" ft":"—"}</b></div><div>${pill("major")}<b>${s.major!=null?s.major.toFixed(1)+" ft":"—"}</b></div></div>`;
+    if(days){const hits=days.map(d=>({d,lv:levelOf(loc,d.fc)})).filter(x=>x.lv!=="none");
+      body+= hits.length?`<ul>${hits.map(x=>`<li>${pill(x.lv)}<span class="when">${fmtDay(x.d.t)} · forecast ${x.d.fc.toFixed(1)} ft · ~${fmtTime(new Date(x.d.t.getTime()+35*60e3))}</span></li>`).join("")}</ul>`:`<div class="hint">${pill("none")} No flood tides in the next ${days.length} days.</div>`;}
+    else body+='<div class="hint">Loading tides…</div>';
+  }
+  const note = s.note? `<div class="note">${s.note}.</div>` : (s.kind==="model"?`<div class="note">Estimated from 1-meter lidar and SFEI shoreline data; not yet checked against what residents see. Minor = first water on the street, moderate = about 40% of it wet, major = 40% under 6+ inches.</div>`:"");
+  el.innerHTML=`<h3>${s.name}<span class="kind">${KIND[s.kind]}</span></h3><div class="where">${s.town} · <a href="${map}" target="_blank" rel="noopener">map</a> · levels are on the SF tide gauge scale, same as the outlook below</div>${body}${note}`;
+}
+document.getElementById("street").addEventListener("input",renderStreet);
+document.getElementById("street").addEventListener("change",renderStreet);
+document.getElementById("streetClear").onclick=()=>{document.getElementById("street").value="";try{localStorage.removeItem("street")}catch(e){};renderStreet();};
 
 async function load(){
   const now=new Date();
@@ -309,7 +373,7 @@ function render(){
     td.addEventListener("focus",()=>{const r=td.getBoundingClientRect();showTip(html,r.right,r.bottom);}); td.addEventListener("blur",hideTip);
   });
   document.getElementById("legend").innerHTML=LEVELS.map(lv=>pill(lv)).join("")+`<span>Number = forecast high tide, ft on the SF scale</span>`;
-  drawPeak(); drawTrend();
+  drawPeak(); drawTrend(); renderStreet();
 }
 
 const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
