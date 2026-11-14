@@ -116,6 +116,7 @@ a{color:var(--s1)}
 .searchrow input{flex:1;min-width:0;font:inherit;font-size:16px;padding:10px 12px;border-radius:10px;border:1px solid var(--ring);background:var(--page);color:var(--ink)}
 .searchrow input:focus{outline:2px solid var(--s1);outline-offset:1px}
 .searchrow button{font:inherit;font-size:13px;border:1px solid var(--ring);background:var(--surface);color:var(--ink2);border-radius:10px;padding:0 12px;cursor:pointer}
+.pastdetail{margin-top:10px;font-size:14px}.pastdetail .row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-bottom:1px solid var(--grid)}.pastdetail ul{margin:8px 0 0;padding-left:18px}
 .sres{margin-top:14px}
 .sres h3{margin:0;font-size:18px}
 .sres .where{font-size:13px;color:var(--muted);margin:2px 0 10px}
@@ -152,6 +153,17 @@ a{color:var(--s1)}
     <div class="wxwarn" id="wxWarn" hidden>Weather data didn't load, so today's full offset (storm surge included) is applied to every day. Days past this week will read too high. Reload in a minute.</div>
     <div class="chart" id="peakChart"></div>
     <details><summary>Show as table</summary><div id="peakTable"></div></details>
+  </div>
+</section>
+
+<section id="pastSec">
+  <h2>Past high tides</h2>
+  <p class="sub">The highest water each day at the San Francisco gauge over the last 30 days: what NOAA's tide tables predicted, and what actually happened. Dot color is the worst flood level it reached at the locations above. Flags mark days with resident or city reports. Tap a day for details.</p>
+  <div class="card">
+    <div class="keyrow"><span><i style="background:var(--s1)"></i>Measured</span><span><i style="background:var(--muted)"></i>NOAA prediction</span><span>⚑ Report</span></div>
+    <div class="chart" id="pastChart"><div class="skeleton">Loading the last 30 days…</div></div>
+    <div id="pastDetail" class="pastdetail"></div>
+    <details><summary>Show as table</summary><div id="pastTable"></div></details>
   </div>
 </section>
 
@@ -321,6 +333,8 @@ function renderStreet(){
       body+= hits.length?`<ul>${hits.map(x=>`<li>${x.up?pill(x.lv).replace(/>([A-Za-z]+)</,'>Possible $1<'):pill(x.lv)}<span class="when">${fmtDay(x.d.t)} · forecast ${x.d.fc.toFixed(1)} ft${upTxt(x.d)}${x.d.rrisk?` · <b>+ rain ${x.d.rain.toFixed(1)}"</b>`:""}${x.d.wx!=null&&Math.abs(x.d.wx)>=0.05?` (weather ${f1(x.d.wx)})`:""} · ~${fmtTime(new Date(x.d.t.getTime()+(s.lag||35)*60e3))}${s.closed&&x.lv!=="minor"?(()=>{const pk=x.d.t.getTime()+(s.lag||35)*60e3;return `<br><b>Likely closed ~${fmtTime(new Date(pk+s.closed[0]*60e3))}–${fmtTime(new Date(pk+(s.closed[1]+(x.d.rrisk?60:0))*60e3))}</b>${x.d.rrisk?" (longer with rain)":""}`})():""}</span></li>`).join("")}</ul>`:`<div class="hint">${pill("none")} No flood tides in the next ${days.length} days.</div>`;}
     else body+='<div class="hint">Loading tides…</div>';
   }
+  if(PAST&&s.kind!=="protected"){ const ph=PAST.filter(d=>d.obs>=s.minor).slice().reverse();
+    body+=`<div class="hint" style="margin-top:10px"><b>Last 30 days:</b> ${ph.length?ph.map(d=>`${fmtDay(d.ot)} (${d.obs.toFixed(1)} ft, ${LABEL[levelOf({minor:s.minor,moderate:s.moderate??Infinity,major:s.major??Infinity},d.obs)].toLowerCase()})`).join(", "):"the measured tide didn't reach this street's flood line."}</div>`; }
   const note = s.note? `<div class="note">${s.note}.</div>` : (s.kind==="model"?`<div class="note">Estimated from 1-meter lidar and SFEI shoreline data; not yet checked against what residents see. Minor = first water on the street, moderate = about 40% of it wet, major = 40% under 6+ inches.</div>`:"");
   el.innerHTML=`<h3>${s.name}<span class="kind">${KIND[s.kind]}</span></h3><div class="where">${s.town} · <a href="${map}" target="_blank" rel="noopener">map</a> · levels are on the SF tide gauge scale, same as the outlook below</div>${body}${note}`;
 }
@@ -621,6 +635,73 @@ function drawPeak(){
   document.getElementById("peakTable").innerHTML=`<table class="datatable"><thead><tr><th>Day</th><th>SF high</th><th>Prediction</th><th>Forecast</th>${LOCATIONS.map(l=>`<th>${l.name}</th>`).join("")}</tr></thead><tbody>${days.map(d=>`<tr><td>${fmtDay(d.t)}</td><td>${fmtTime(d.t)}</td><td>${d.pred.toFixed(2)}</td><td>${d.fc.toFixed(2)}</td>${LOCATIONS.map(l=>`<td>${LABEL[levelOf(l,d.fc)]}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
 }
 
+
+/* ---------- Past high tides: measured vs predicted, last 30 days ---------- */
+// Resident and city reports, by local date. Add new ones here as they come in.
+const REPORTS=[
+  {d:"2026-10-28",t:"Miller Ave closed by tidal flooding, Mill Valley"},
+  {d:"2026-10-28",t:"Dellwood Ct, San Rafael: water halfway up driveways through the storm drains (late-October king tides)"},
+  {d:"2026-10-29",t:"Caltrans closed the 101 to Hwy 1 ramp at Manzanita, about 1 to 6:30 PM"},
+  {d:"2026-11-09",t:"Miller Ave closed (closed every day Nov 9–13)"},
+  {d:"2026-11-10",t:"Miller Ave closed"},
+  {d:"2026-11-11",t:"Miller Ave closed"},
+  {d:"2026-11-12",t:"Miller Ave closed 1:12–3:24 PM, Redwood Hwy Frontage Rd closed 1:29–3:24 PM (Mill Valley police)"},
+  {d:"2026-11-12",t:"Golden Hind, Corte Madera: water 1.8 ft above the tide table, per a resident"},
+  {d:"2026-11-13",t:"Miller Ave and Redwood Hwy Frontage Rd closed from 12:01 PM, still closed after 4 PM with rain (Mill Valley police)"},
+  {d:"2026-11-13",t:"Point San Pedro Rd at Dellwood, San Rafael: water across both lanes at 11:50 AM (resident video)"},
+];
+let PAST=null;
+const dkey=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+async function loadPast(){
+  const el=document.getElementById("pastChart");
+  try{
+    const end=new Date(), beg=new Date(end.getTime()-30*86400e3);
+    const [wl,pr]=await Promise.all([
+      noaa({product:"water_level",station:SF,begin_date:ymd(beg),end_date:ymd(end)}),
+      noaa({product:"predictions",station:SF,begin_date:ymd(beg),end_date:ymd(end),interval:"hilo"})]);
+    const by={};
+    for(const x of wl.data||[]){ if(x.v==="") continue; const t=parseT(x.t), k=dkey(t), v=+x.v; if(!by[k]||v>by[k].obs) by[k]={...(by[k]||{}),obs:v,ot:t}; }
+    for(const x of pr.predictions||[]){ if(x.type!=="H") continue; const t=parseT(x.t), k=dkey(t), v=+x.v; if(by[k]&&(by[k].pred==null||v>by[k].pred)) {by[k].pred=v;by[k].pt=t;} }
+    PAST=Object.entries(by).sort().map(([k,v])=>({k,...v})).filter(d=>d.pred!=null&&d.k!==dkey(end));   // today is still in progress
+    drawPast(); renderStreet();
+  }catch(e){ el.innerHTML=`<div class="hint">Couldn't load past tides (${e.message}). Reload in a minute.</div>`; }
+}
+function worstAt(v){ let w="none"; for(const l of LOCATIONS){const lv=levelOf(l,v); if(LEVELS.indexOf(lv)>LEVELS.indexOf(w)) w=lv;} return w; }
+function pastInfo(d){
+  const hits=LOCATIONS.map(l=>[l,levelOf(l,d.obs)]).filter(([,lv])=>lv!=="none"), rep=REPORTS.filter(r=>r.d===d.k);
+  return `<div style="font-weight:700;margin-bottom:4px">${fmtDay(d.ot)}</div>
+    <div class="row"><span>Measured peak at SF</span><b>${d.obs.toFixed(2)} ft · ${fmtTime(d.ot)}</b></div>
+    <div class="row"><span>Tide table predicted</span><span>${d.pred.toFixed(2)} ft</span></div>
+    <div class="row"><span>Above prediction</span><span>${f1(d.obs-d.pred)} ft</span></div>
+    ${hits.length?`<div style="margin-top:6px;display:grid;gap:3px">${hits.map(([l,lv])=>`<div>${pill(lv)} ${l.name}</div>`).join("")}</div>`:`<div style="margin-top:6px;color:var(--ink2)">Below the flood lines at the tracked locations</div>`}
+    ${rep.length?`<ul>${rep.map(r=>`<li>⚑ ${r.t}</li>`).join("")}</ul>`:""}`;
+}
+function drawPast(){
+  if(!PAST||!PAST.length) return; const days=PAST, el=document.getElementById("pastChart");
+  const W=Math.max(320,el.clientWidth||900), H=240, m={l:40,r:12,t:18,b:30};
+  const lo=Math.floor(Math.min(...days.map(d=>d.pred))-0.3), hi=Math.ceil(Math.max(...days.map(d=>d.obs))+0.3);
+  const x=i=>m.l+(i+0.5)*(W-m.l-m.r)/days.length, y=v=>m.t+(hi-v)/(hi-lo)*(H-m.t-m.b);
+  let s=svgEl(W,H)+`<title>Daily highest water at San Francisco, measured vs predicted, last 30 days</title>`;
+  for(const v of niceTicks(lo,hi,0.5)) s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="${cssv('--grid')}" stroke-width="1"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end">${v.toFixed(1)}</text>`;
+  s+=`<text x="${m.l}" y="${m.t-6}" text-anchor="start" style="font-size:10.5px">ft (SF)</text>`;
+  s+=`<polyline points="${days.map((d,i)=>`${x(i)},${y(d.pred)}`).join(" ")}" fill="none" stroke="${cssv('--muted')}" stroke-width="2" stroke-dasharray="4 4" stroke-linejoin="round"/>`;
+  s+=`<polyline points="${days.map((d,i)=>`${x(i)},${y(d.obs)}`).join(" ")}" fill="none" stroke="${cssv('--s1')}" stroke-width="2" stroke-linejoin="round"/>`;
+  days.forEach((d,i)=>{ const w=worstAt(d.obs), c=w==="none"?cssv('--s1'):cssv('--'+w);
+    s+=`<circle cx="${x(i)}" cy="${y(d.obs)}" r="${w==="none"?3.5:5}" fill="${c}" stroke="${cssv('--surface')}" stroke-width="1.5"/>`;
+    if(REPORTS.some(r=>r.d===d.k)) s+=`<text x="${x(i)}" y="${y(d.obs)-9}" text-anchor="middle" style="font-size:11px;fill:${cssv('--ink')}">⚑</text>`;
+    if(i%Math.ceil(days.length/(W<600?5:10))===0) s+=`<text x="${x(i)}" y="${H-m.b+16}" text-anchor="middle">${d.ot.getMonth()+1}/${d.ot.getDate()}</text>`; });
+  s+=`<line id="ps-x" x1="0" x2="0" y1="${m.t}" y2="${H-m.b}" stroke="${cssv('--axis')}" stroke-width="1" opacity="0"/>`;
+  s+=`<rect x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="transparent" id="ps-hit" style="touch-action:pan-y"/></svg>`;
+  el.innerHTML=s;
+  const svg=el.querySelector("svg"), hit=el.querySelector("#ps-hit"), xl=el.querySelector("#ps-x"), det=document.getElementById("pastDetail");
+  const pick=i=>{ xl.setAttribute("x1",x(i));xl.setAttribute("x2",x(i));xl.setAttribute("opacity",1); det.innerHTML=pastInfo(days[i]); };
+  const mv=e=>{const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(svg.getScreenCTM().inverse());
+    pick(Math.max(0,Math.min(days.length-1,Math.floor((q.x-m.l)/((W-m.l-m.r)/days.length)))));};
+  hit.addEventListener("pointermove",mv); hit.addEventListener("pointerdown",mv);
+  pick(days.reduce((a,d,i)=>d.obs>days[a].obs?i:a,0));   // start on the highest day
+  document.getElementById("pastTable").innerHTML=`<table class="datatable"><thead><tr><th>Day</th><th>Measured</th><th>Predicted</th><th>Above</th>${LOCATIONS.map(l=>`<th>${l.name}</th>`).join("")}<th>Reports</th></tr></thead><tbody>${days.slice().reverse().map(d=>`<tr><td>${fmtDay(d.ot)}</td><td>${d.obs.toFixed(2)}</td><td>${d.pred.toFixed(2)}</td><td>${f1(d.obs-d.pred)}</td>${LOCATIONS.map(l=>{const lv=levelOf(l,d.obs);return `<td>${lv==="none"?"–":LABEL[lv]}</td>`}).join("")}<td>${REPORTS.filter(r=>r.d===d.k).map(r=>r.t).join("; ")}</td></tr>`).join("")}</tbody></table>`;
+}
+
 function drawTrend(){
   const el=document.getElementById("trendChart"), key=document.getElementById("trendKey");
   const cols=["--s1","--s2","--s3","--s4"];
@@ -657,7 +738,8 @@ function drawTrend(){
 }
 
 document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{DAYS=+b.dataset.d;render();});
-let rz; addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{if(STATE){drawPeak();drawTrend();}},150);});
+let rz; addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{if(STATE){drawPeak();drawTrend();} drawPast();},150);});
+loadPast();
 load().catch(e=>{document.getElementById("hero").innerHTML=`<div class="err">Couldn't load NOAA data: ${e.message}. NOAA's API is sometimes briefly down; try reloading in a minute.</div>`;document.getElementById("meta").textContent="";});
 </script>
 </body>
