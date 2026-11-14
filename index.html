@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Marin King Tide Outlook</title>
-<meta name="description" content="Street-level king tide flood outlook for Corte Madera, Larkspur, Greenbrae and east San Rafael: NOAA tide predictions plus the Kelvin-wave sea-level anomaly and forecast pressure and wind, checked against each street's flood lines.">
+<meta name="description" content="Street-level king tide flood outlook for Corte Madera, Larkspur, Greenbrae, Mill Valley and east San Rafael: NOAA tide predictions plus the Kelvin-wave sea-level anomaly and forecast pressure and wind, checked against each street's flood lines.">
 <meta property="og:title" content="Marin King Tide Outlook">
 <meta property="og:description" content="Check your street: 30-day king tide flood outlook for east Marin, with the Kelvin wave, air pressure and wind built in.">
 <style>
@@ -136,7 +136,7 @@ a{color:var(--s1)}
 <header>
   <button class="toggle" id="themeBtn" type="button" aria-label="Toggle dark mode">Theme</button>
   <h1>Marin King Tide Outlook</h1>
-  <p>Live tides and flood outlook for low-lying streets in Corte Madera, Larkspur and east San Rafael. <a href="#how">How it works</a></p>
+  <p>Live tides and flood outlook for low-lying streets in Corte Madera, Larkspur, Mill Valley and east San Rafael. <a href="#how">How it works</a></p>
   <div class="meta" id="meta">Loading live NOAA data…</div>
 </header>
 
@@ -157,7 +157,7 @@ a{color:var(--s1)}
 
 <section id="lookupSec">
   <h2>Check your street</h2>
-  <p class="sub">Covers 246 low-lying streets in Corte Madera, Larkspur, Greenbrae and east San Rafael (Canal, Bahia, Spinnaker Point, Peacock Gap). Pick a street to see its flood lines and the next tides that reach them.</p>
+  <p class="sub">Covers 249 low-lying streets in Corte Madera, Larkspur, Greenbrae, east San Rafael (Canal, Bahia, Spinnaker Point, Peacock Gap) and the Miller Ave / Tam Junction area of Mill Valley. Pick a street to see its flood lines and the next tides that reach them.</p>
   <div class="card">
     <label for="street" class="lbl">Street</label>
     <div class="searchrow"><input id="street" list="streetList" placeholder="Start typing, e.g. Golden Hind" autocomplete="off" spellcheck="false"><button type="button" id="streetClear" aria-label="Clear">Clear</button></div>
@@ -205,7 +205,7 @@ a{color:var(--s1)}
     <li><b>Tide:</b> NOAA's hourly predictions for the San Francisco gauge (9414290), in feet above mean lower low water. All thresholds use that same scale.</li>
     <li><b>Rain:</b> National Weather Service 6-hour rain forecast for the Corte Madera shoreline, and live flow on Corte Madera Creek at Ross (USGS 11460000). We flag a high tide when about a quarter inch of rain is forecast within 3 hours of a tide over 6.0 ft, and call it high risk at half an inch with a tide over 6.5 ft. Those cutoffs are estimates. We don't model storm drains, pumps or creek flooding, so treat the flag as "be alert," not a street-by-street forecast.</li>
     <li><b>Anomaly:</b> measured minus predicted water level at San Francisco, averaged over the hour either side of the last two high tides (or the last 25 hours if that's unavailable). The current weather effect is subtracted out, and what's left (mostly the slow Kelvin wave buildup) is carried forward unchanged.</li>
-    <li><b>Street lookup:</b> flood lines for 246 streets come from a flood-connectivity model on 2018 USGS 1-meter lidar with SFEI Bay Shore Inventory barriers and tide gates treated as closed, run at 5 cm water-level steps. Five streets are calibrated from resident reports; the rest are model estimates (about ±0.5 ft). "Behind levees / pumps" means the street is below ordinary high tides and stays dry only because of infrastructure.</li>
+    <li><b>Street lookup:</b> flood lines for 249 streets come from a flood-connectivity model on 2018 USGS 1-meter lidar with SFEI Bay Shore Inventory barriers and tide gates treated as closed, run at 5 cm water-level steps. Five streets are calibrated from resident reports. Mill Valley (Tam Junction, Miller Ave, Almonte) uses Marin County's 6.2 ft onset for the Manzanita interchange, lidar road heights converted from Richardson Bay, and the Oct 28, 2026 Miller closure, with high tide about 25 minutes after SF; the rest are model estimates (about ±0.5 ft). "Behind levees / pumps" means the street is below ordinary high tides and stays dry only because of infrastructure.</li>
     <li><b>Thresholds:</b> each street's flood lines come from a 1-meter lidar flood model, SFEI's Bay shoreline data, resident photos (Jan 1–3, 2026 and Oct 27–29, 2026) and the WET app's flood lines. They are estimates. Pump stations, storm drains and rain all shift them.</li>
     <li><b>Weather:</b> low pressure and southerly winds raise the Bay; high pressure and northerly or westerly winds lower it. Fit on 10 years of NOAA Richmond data: about −1.04 cm per millibar (the classic inverse-barometer effect) and, for a steady 10 m/s (22 mph) wind, about +17 cm (6.6 in) from the southeast or −17 cm from the northwest. It explains roughly half of a typical storm surge. Weather forecasts come from <a href="https://open-meteo.com/">Open-Meteo</a> for the Golden Gate area, and the current weather effect is removed from today's anomaly so it isn't counted twice.</li>
     <li><b>Not included:</b> rain, waves, river flow, and local effects inside San Rafael Bay and Corte Madera Creek beyond what the Richmond gauge sees. During a storm, check the <a href="https://www.weather.gov/mtr/">NWS Bay Area coastal flood advisories</a>.</li>
@@ -233,6 +233,13 @@ const LOCATIONS = [
   { id:"lucky", name:"Lucky Drive", where:"Corte Madera / Larkspur, by Hwy 101", offsetMin:40,
     minor:6.9, moderate:7.85, major:8.0,
     notes:{minor:"Some water, pumps usually keep up", moderate:"Significant water on the road", major:"Deep flooding, avoid"} },
+  // Mill Valley (Richardson Bay): Manzanita onset 6.2 ft from Marin County; Miller from lidar + Oct 28, 2026 closure. Estimates.
+  { id:"tamjct", name:"Tam Junction / 101 exit", where:"Shoreline Hwy at Manzanita, Mill Valley", offsetMin:25,
+    minor:6.2, moderate:6.8, major:7.4,
+    notes:{minor:"Water in the park-and-ride and road edges", moderate:"Shoreline Hwy under 101 and the off-ramp flooding", major:"Expect the exit and Shoreline Hwy closed"} },
+  { id:"miller", name:"Miller Ave at Tam High", where:"Along the marsh, Mill Valley", offsetMin:25,
+    minor:7.5, moderate:7.8, major:8.2,
+    notes:{minor:"Marsh water at the road edge", moderate:"Water on Miller; often closed, detour via Laverne Ave", major:"Miller closed, deep water by the marsh"} },
 ];
 const SF="9414290";
 const TREND_STATIONS=[{id:"9410170",name:"San Diego"},{id:"9412110",name:"Port San Luis"},{id:"9413450",name:"Monterey"},{id:"9414290",name:"San Francisco"}];
@@ -293,7 +300,7 @@ function renderStreet(){
   if(!STREETS){el.innerHTML='<div class="hint">Loading streets…</div>';return;}
   if(!s){ const q=(v||"").trim().toLowerCase(); const m=q.length>=3?STREETS.filter(x=>x.name.toLowerCase().includes(q)).slice(0,8):[];
     el.innerHTML = m.length? `<div class="hint">Did you mean: ${m.map(x=>`<a href="#" data-s="${x.name} — ${x.town}">${x.name} (${x.town})</a>`).join(", ")}</div>`
-      : `<div class="hint">${q.length>=3?"Not in the covered area, or not low enough to flood on tides under about 10 ft. ":""}Try Golden Hind, Lucky, Riviera, Canal, Bahia or Peacock.</div>`;
+      : `<div class="hint">${q.length>=3?"Not in the covered area, or not low enough to flood on tides under about 10 ft. ":""}Try Golden Hind, Lucky, Riviera, Miller, Canal, Bahia or Peacock.</div>`;
     el.querySelectorAll("a[data-s]").forEach(a=>a.onclick=e=>{e.preventDefault();document.getElementById("street").value=a.dataset.s;renderStreet();}); return; }
   try{localStorage.setItem("street",`${s.name} — ${s.town}`)}catch(e){}
   const map=`https://www.openstreetmap.org/?mlat=${s.lat}&mlon=${s.lon}#map=17/${s.lat}/${s.lon}`;
@@ -302,12 +309,12 @@ function renderStreet(){
     body=`<div class="thr"><div>Lowest ground on the street<b>${s.low.toFixed(1)} ft</b></div><div>Watch when the SF tide forecast reaches<b>${PROT_WATCH.toFixed(1)} ft</b></div></div>
       <div class="hint">Parts of this street sit below ordinary high tides and are kept dry by levees, tide gates or pumps. This tool can't predict when those are overwhelmed. On Jan 2–3, 2026 (8.1–8.3 ft at SF) several protected areas in Corte Madera and San Rafael flooded.</div>`;
     if(days){const w=days.filter(d=>d.fc>=PROT_WATCH);
-      body+= w.length?`<ul style="margin-top:10px">${w.map(d=>`<li>${pill("minor").replace("Minor","Watch")}<span class="when">${fmtDay(d.t)} · forecast ${d.fc.toFixed(1)} ft${d.wx!=null&&Math.abs(d.wx)>=0.05?` (weather ${f1(d.wx)})`:""} · ~${fmtTime(new Date(d.t.getTime()+35*60e3))}</span></li>`).join("")}</ul>`:`<div class="hint" style="margin-top:10px">${pill("none")} No tides at the watch level in the next ${days.length} days.</div>`;}
+      body+= w.length?`<ul style="margin-top:10px">${w.map(d=>`<li>${pill("minor").replace("Minor","Watch")}<span class="when">${fmtDay(d.t)} · forecast ${d.fc.toFixed(1)} ft${d.wx!=null&&Math.abs(d.wx)>=0.05?` (weather ${f1(d.wx)})`:""} · ~${fmtTime(new Date(d.t.getTime()+(s.lag||35)*60e3))}</span></li>`).join("")}</ul>`:`<div class="hint" style="margin-top:10px">${pill("none")} No tides at the watch level in the next ${days.length} days.</div>`;}
   } else {
     const loc={minor:s.minor,moderate:s.moderate??Infinity,major:s.major??Infinity};
     body=`<div class="thr"><div>${pill("minor")}<b>${s.minor.toFixed(1)} ft</b></div><div>${pill("moderate")}<b>${s.moderate!=null?s.moderate.toFixed(1)+" ft":"—"}</b></div><div>${pill("major")}<b>${s.major!=null?s.major.toFixed(1)+" ft":"—"}</b></div></div>`;
     if(days){const hits=days.map(d=>({d,lv:levelOf(loc,d.fc)})).filter(x=>x.lv!=="none");
-      body+= hits.length?`<ul>${hits.map(x=>`<li>${pill(x.lv)}<span class="when">${fmtDay(x.d.t)} · forecast ${x.d.fc.toFixed(1)} ft${x.d.rrisk?` · <b>+ rain ${x.d.rain.toFixed(1)}"</b>`:""}${x.d.wx!=null&&Math.abs(x.d.wx)>=0.05?` (weather ${f1(x.d.wx)})`:""} · ~${fmtTime(new Date(x.d.t.getTime()+35*60e3))}</span></li>`).join("")}</ul>`:`<div class="hint">${pill("none")} No flood tides in the next ${days.length} days.</div>`;}
+      body+= hits.length?`<ul>${hits.map(x=>`<li>${pill(x.lv)}<span class="when">${fmtDay(x.d.t)} · forecast ${x.d.fc.toFixed(1)} ft${x.d.rrisk?` · <b>+ rain ${x.d.rain.toFixed(1)}"</b>`:""}${x.d.wx!=null&&Math.abs(x.d.wx)>=0.05?` (weather ${f1(x.d.wx)})`:""} · ~${fmtTime(new Date(x.d.t.getTime()+(s.lag||35)*60e3))}</span></li>`).join("")}</ul>`:`<div class="hint">${pill("none")} No flood tides in the next ${days.length} days.</div>`;}
     else body+='<div class="hint">Loading tides…</div>';
   }
   const note = s.note? `<div class="note">${s.note}.</div>` : (s.kind==="model"?`<div class="note">Estimated from 1-meter lidar and SFEI shoreline data; not yet checked against what residents see. Minor = first water on the street, moderate = about 40% of it wet, major = 40% under 6+ inches.</div>`:"");
