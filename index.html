@@ -592,7 +592,7 @@ function drawPeak(){
     if(i%Math.ceil(days.length/(W<600?5:10))===0) s+=`<text x="${x(i)}" y="${H-m.b+16}" text-anchor="middle">${d.t.getMonth()+1}/${d.t.getDate()}</text>`;
     if(d.rrisk) s+=`<path d="M${x(i)+(d.up?10:0)} ${y(d.fc)-17} q-5 7 0 10 q5 -3 0 -10z" fill="${cssv(d.rrisk==="high"?'--moderate':'--minor')}" stroke="${cssv('--ink')}" stroke-width="0.6"/>`;});
   if(hasRain){ const top=H-RS+6, bh=RS-16, bw=Math.max(3,(W-m.l-m.r)/days.length*0.6), rmax=Math.max(1,...days.map(d=>d.rain||0));
-    s+=`<text x="${m.l-6}" y="${top+8}" text-anchor="end" style="font-size:10px">rain</text><line x1="${m.l}" x2="${W-m.r}" y1="${top+bh}" y2="${top+bh}" stroke="${cssv('--grid')}"/>`;
+    s+=`<text x="${m.l-6}" y="${top+8}" text-anchor="end" style="font-size:10px">rain</text><text x="${W-m.r}" y="${top-2}" text-anchor="end" style="font-size:10px;fill:${cssv('--muted')}">inches of rain within 3 h of each high tide</text><line x1="${m.l}" x2="${W-m.r}" y1="${top+bh}" y2="${top+bh}" stroke="${cssv('--grid')}"/>`;
     days.forEach((d,i)=>{ if(d.rain==null||d.rain<0.01) return; const hgt=Math.max(2,d.rain/rmax*bh);
       s+=`<rect x="${x(i)-bw/2}" y="${top+bh-hgt}" width="${bw}" height="${hgt}" rx="1.5" fill="${cssv(d.rrisk==="high"?'--moderate':d.rrisk?'--minor':'--s1')}" opacity="${d.rrisk?1:.55}"/>`;
       if(d.rain>=0.1) s+=`<text x="${x(i)}" y="${top+bh-hgt-3}" text-anchor="middle" style="font-size:9.5px">${d.rain.toFixed(1)}</text>`; }); }
