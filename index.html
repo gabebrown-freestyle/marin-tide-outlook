@@ -288,7 +288,7 @@ function hideTip(){tip.style.opacity=0;}
 
 let STATE=null, STREETS=null, PROT_WATCH=8.1;
 const KIND={calibrated:"Checked against resident reports",model:"Model estimate, ±0.5 ft",basin:"Lucky Drive low area",protected:"Behind levees / pumps"};
-fetch("streets.json").then(r=>r.json()).then(j=>{STREETS=j.streets;PROT_WATCH=j.protected_watch||8.1;
+fetch("streets.json",{cache:"no-cache"}).then(r=>r.json()).then(j=>{STREETS=j.streets;PROT_WATCH=j.protected_watch||8.1;
   const dl=document.getElementById("streetList"); dl.innerHTML=STREETS.map(s=>`<option value="${s.name} — ${s.town}"></option>`).join("");
   let saved=null; try{saved=localStorage.getItem("street")}catch(e){}
   if(saved){document.getElementById("street").value=saved;} renderStreet();}).catch(()=>{document.getElementById("streetResult").innerHTML='<div class="hint">Street list failed to load.</div>';});
