@@ -207,7 +207,7 @@ a{color:var(--s1)}
     <li><b>Anomaly:</b> measured minus predicted water level at San Francisco, averaged over the hour either side of the last two high tides (or the last 25 hours if that's unavailable). The current weather effect is subtracted out, and what's left (mostly the slow Kelvin wave buildup) is carried forward unchanged.</li>
     <li><b>Street lookup:</b> flood lines for 250 streets come from a flood-connectivity model on 2018 USGS 1-meter lidar with SFEI Bay Shore Inventory barriers and tide gates treated as closed, run at 5 cm water-level steps. Six streets are calibrated from resident reports. Mill Valley (Tam Junction, Miller Ave, Almonte) uses Marin County's 6.2 ft onset for the Manzanita interchange, lidar road heights converted from Richardson Bay, and Miller closures on Oct 28 and Nov 9–13, 2026 (SF peaks 7.2–7.9 ft), with high tide about 25 minutes after SF; the rest are model estimates (about ±0.5 ft). "Behind levees / pumps" means the street is below ordinary high tides and stays dry only because of infrastructure.</li>
     <li><b>Thresholds:</b> each street's flood lines come from a 1-meter lidar flood model, SFEI's Bay shoreline data, resident photos (Jan 1–3, 2026 and Oct 27–29, 2026) and the WET app's flood lines. They are estimates. Pump stations, storm drains and rain all shift them.</li>
-    <li><b>Weather:</b> low pressure and southerly winds raise the Bay; high pressure and northerly or westerly winds lower it. Fit on 10 years of NOAA Richmond data: about −1.04 cm per millibar (the classic inverse-barometer effect) and, for a steady 10 m/s (22 mph) wind, about +17 cm (6.6 in) from the southeast or −17 cm from the northwest. It explains roughly half of a typical storm surge. Weather forecasts come from <a href="https://open-meteo.com/">Open-Meteo</a> for the Golden Gate area, and the current weather effect is removed from today's anomaly so it isn't counted twice.</li>
+    <li><b>Weather:</b> low pressure and southerly winds raise the Bay; high pressure and northerly or westerly winds lower it. Fit on 10 years of NOAA Richmond data: about −1.04 cm per millibar (the classic inverse-barometer effect) and, for a steady 10 m/s (22 mph) wind, about +17 cm (6.6 in) from the southeast or −17 cm from the northwest. It explains roughly half of a typical storm surge. Weather forecasts come from <a href="https://open-meteo.com/">Open-Meteo</a> for the Golden Gate area, and the current weather effect is removed from today's anomaly so it isn't counted twice. Weather forecasts lose skill after about 5 days, so the weather effect fades to zero by day 10. Storm surge in today's anomaly also fades (over about 3 days) toward the 14-day average at SF, which is the slow Kelvin-wave and seasonal part.</li>
     <li><b>Not included:</b> rain, waves, river flow, and local effects inside San Rafael Bay and Corte Madera Creek beyond what the Richmond gauge sees. During a storm, check the <a href="https://www.weather.gov/mtr/">NWS Bay Area coastal flood advisories</a>.</li>
     <li>This is a community project, not an official warning. Don't drive through floodwater.</li>
   </ul>
@@ -373,7 +373,7 @@ function renderNow(){
   const ft=t=>fmtTime(new Date(t));
   const next=(h,label)=>h?`<div>${label}<b>${(h.v+off).toFixed(1)} ft</b>${ft(h.t+lag)}${h.t+lag-now<86400e3&&new Date(h.t+lag).getDate()!==new Date(now).getDate()?" tomorrow":""}</div>`:"";
   // curve: 6 h back to 12 h ahead, observed (solid) then forecast (dashed), shifted by the local lag
-  const W=Math.max(300,el.clientWidth-36||600), H=150, m={l:30,r:8,t:10,b:20}, t0=now-6*3600e3, t1=now+12*3600e3;
+  const W=Math.max(300,el.clientWidth-36||600), H=176, m={l:30,r:8,t:24,b:34}, t0=now-6*3600e3, t1=now+12*3600e3;
   const ob=obs.filter(o=>o.t+lag>=t0).map(o=>({t:o.t+lag,v:o.v}));
   const fc=STATE.pred6.filter(p=>p.t+lag>=Math.min(last.t+lag,now)&&p.t+lag<=t1).map(p=>({t:p.t+lag,v:p.v+off}));
   const vals=[...ob,...fc].map(p=>p.v).concat(thr?[thr.minor]:[]); const lo=Math.floor(Math.min(...vals)-0.3), hi=Math.ceil(Math.max(...vals)+0.3);
@@ -384,6 +384,18 @@ function renderNow(){
   if(thr) g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(thr.minor)}" y2="${Y(thr.minor)}" stroke="${cssv('--minor')}" stroke-width="2" stroke-dasharray="6 4"/><text x="${W-m.r}" y="${Y(thr.minor)-4}" text-anchor="end" style="font-size:10.5px;font-weight:600;fill:${cssv('--ink2')}">street floods</text>`;
   g+=`<polyline points="${fc.map(p=>`${X(p.t)},${Y(p.v)}`).join(" ")}" fill="none" stroke="${cssv('--s1')}" stroke-width="2" stroke-dasharray="4 4"/>`;
   g+=`<polyline points="${ob.map(p=>`${X(p.t)},${Y(p.v)}`).join(" ")}" fill="none" stroke="${cssv('--s1')}" stroke-width="3" stroke-linejoin="round"/>`;
+  // Mark each high and low in the window: observed where we have it, forecast after that
+  const pts=[...ob,...fc].sort((a,b)=>a.t-b.t), ext=[];
+  for(let i=0;i<pts.length;i++){ const p=pts[i]; if(p.t-t0<40*60e3||t1-p.t<40*60e3) continue;
+    const nb=pts.filter(q=>Math.abs(q.t-p.t)<=75*60e3);
+    const isHi=nb.every(q=>q.v<=p.v), isLo=nb.every(q=>q.v>=p.v);
+    if((isHi||isLo)&&!ext.some(e=>Math.abs(e.t-p.t)<3*3600e3)){ const ob_=p.t<=last.t+lag, hl=ob_?null:STATE.hilo.find(x=>Math.abs(x.t+lag-p.t)<60*60e3);
+      ext.push(hl?{t:hl.t+lag,v:hl.v+off,hi:isHi,obs:false}:{...p,hi:isHi,obs:ob_}); } }
+  for(const e of ext){ const ex=X(e.t), an=ex<m.l+75?"start":ex>W-m.r-75?"end":"middle", x=an==="start"?Math.max(ex-8,m.l+2):an==="end"?ex+8:ex, lab=`${e.v.toFixed(1)} ft ${new Date(e.t).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}).replace(" ","\u2009")}`;
+    g+=`<circle cx="${X(e.t)}" cy="${Y(e.v)}" r="${e.hi?4.5:3.5}" fill="${e.hi?cssv('--ink'):cssv('--surface')}" stroke="${cssv('--ink')}" stroke-width="1.5"/>`;
+    g+= e.hi?`<text x="${Math.min(x,W-2)}" y="${Y(e.v)-9}" text-anchor="${an}" style="font-size:11px;font-weight:700;fill:${cssv('--ink')}">${e.obs?"Peak":"High"} ${lab}</text>`
+            :`<text class="lowlab" x="${x}" y="${Y(e.v)+17}" text-anchor="${an}" style="font-size:10.5px;fill:${cssv('--muted')}">Low ${lab}</text>`; }
+  g+=`<g class="scrub" style="display:none"><line y1="${m.t}" y2="${H-m.b}" stroke="${cssv('--ink')}" stroke-width="1.5"/><circle r="5" fill="${cssv('--s1')}" stroke="${cssv('--surface')}" stroke-width="2"/><text y="${H-m.b+16}" text-anchor="middle" style="font-size:11.5px;font-weight:700;fill:${cssv('--ink')}"></text></g>`;
   g+=`<line x1="${X(now)}" x2="${X(now)}" y1="${m.t}" y2="${H-m.b}" stroke="${cssv('--ink')}" stroke-dasharray="2 3"/><circle cx="${X(now)}" cy="${Y(lvl)}" r="6" fill="${cssv('--s1')}" stroke="${cssv('--surface')}" stroke-width="2.5"/></svg>`;
   const age=Math.round((now-last.t)/60e3);
   const r6=rainBetween(now,now+6*3600e3);
@@ -403,6 +415,12 @@ function renderNow(){
     <div class="nexts">${next(nh,"Next high")}${next(nl,"Next low")}</div>
     <div class="curve">${g}</div>
     <div class="fine">${s?`Estimated from NOAA's San Francisco gauge, shifted about ${LAG_MIN} minutes for the lag to this shoreline. `:""}Gauge reading ${age<=1?"just now":age+" min ago"}; updates every 6 minutes. Feet above mean lower low water, the same scale as the flood lines. Highs and lows include today's ${f1(off)} ft above NOAA's prediction.</div>`;
+  { const svg=el.querySelector(".curve svg"), sc=svg.querySelector(".scrub"), [ln,ci,tx]=sc.children;
+    const move=ev=>{ const r=svg.getBoundingClientRect(), x=(ev.clientX-r.left)*W/r.width; if(x<m.l||x>W-m.r){sc.style.display="none";return;}
+      const t=t0+(x-m.l)/(W-m.l-m.r)*(t1-t0); let p=pts[0]; for(const q of pts) if(Math.abs(q.t-t)<Math.abs(p.t-t)) p=q;
+      const px=X(p.t); ln.setAttribute("x1",px); ln.setAttribute("x2",px); ci.setAttribute("cx",px); ci.setAttribute("cy",Y(p.v));
+      tx.setAttribute("x",Math.min(Math.max(px,m.l+55),W-m.r-55)); tx.textContent=`${p.v.toFixed(1)} ft at ${new Date(p.t).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}${p.t>last.t+lag?" (forecast)":""}`; sc.style.display=""; svg.querySelectorAll(".lowlab").forEach(l=>l.style.display="none"); };
+    svg.style.touchAction="pan-y"; svg.addEventListener("pointermove",move); svg.addEventListener("pointerdown",move); svg.addEventListener("pointerleave",()=>{sc.style.display="none";svg.querySelectorAll(".lowlab").forEach(l=>l.style.display="");}); }
 }
 async function refreshObs(){
   if(!STATE) return;
@@ -430,8 +448,9 @@ async function applyWeather(lastHighs){
   const at=t=>{const i=Math.round((t-T[0])/3600e3);return i>=0&&i<T.length?W(i):null;};
   const wn=lastHighs.map(at).filter(v=>v!=null); const wNow=wn.length?wn.reduce((a,b)=>a+b,0)/wn.length:0;
   const base=STATE.anomaly-wNow, tEnd=T[T.length-1];
-  for(const d of STATE.allDays){ const w=d.t.getTime()<=tEnd?at(d.t.getTime()):null; d.wx=w; d.fc=d.pred+base+(w??0); }
+  for(const d of STATE.allDays){ d.wxRaw=d.t.getTime()<=tEnd?at(d.t.getTime()):null; }
   STATE.wx={now:wNow,base,end:new Date(tEnd),Pbar};
+  applyForecast();
 }
 async function load(){
   const now=new Date();
@@ -481,8 +500,21 @@ async function load(){
       const pts=[...agg.entries()].filter(([,a])=>a.n>=200).map(([k,a])=>({d:parseT(k+" 12:00"),v:a.s/a.n})).sort((a,b)=>a.d-b.d);
       return {...st,pts};
     }));
-    STATE.trend=trend; render();
+    STATE.trend=trend;
+    const sf=trend.find(t=>t.id===SF); if(sf){ const cut=now.getTime()-2*86400e3, b=sf.pts.filter(p=>p.d.getTime()<cut).slice(-14);
+      if(b.length>=7){ STATE.bg=b.reduce((s,p)=>s+p.v,0)/b.length; applyForecast(); } }
+    render();
   }catch(e){ STATE.trendErr=e.message; render(); }
+}
+
+// Forecast for each day = astronomical prediction + sea-level anomaly + weather.
+// Today's anomaly includes storm surge the weather fit doesn't fully explain, so it fades (e-folding 3 days)
+// toward the 14-day background (Kelvin wave / seasonal). Weather forecasts lose skill past ~5 days: fade to 0 by day 10.
+function applyForecast(){
+  if(!STATE) return; const now=STATE.now.getTime(), base=STATE.wx?STATE.wx.base:STATE.anomaly, bg=STATE.bg??base;
+  for(const d of STATE.allDays){ const k=Math.max(0,(d.t.getTime()-now)/86400e3);
+    const a=bg+(base-bg)*Math.exp(-k/3), wf=k<=5?1:Math.max(0,1-(k-5)/5);
+    d.anom=a; d.wx=STATE.wx&&d.wxRaw!=null&&wf>0?d.wxRaw*wf:null; d.fc=d.pred+a+(d.wx??0); }
 }
 
 function render(){
@@ -523,7 +555,7 @@ function render(){
     const html=`<b>${loc.name}</b><div style="color:var(--ink2);margin-bottom:4px">${fmtDay(d.t)} · local high ~${fmtTime(new Date(d.t.getTime()+loc.offsetMin*60e3))}</div>
       <div class="row"><span>Forecast (SF scale)</span><b>${d.fc.toFixed(2)} ft</b></div>
       <div class="row"><span>NOAA prediction</span><span>${d.pred.toFixed(2)} ft</span></div>
-      ${STATE.wx?`<div class="row"><span>Sea-level anomaly</span><span>${f1(STATE.wx.base)} ft</span></div><div class="row"><span>Weather (pressure + wind)</span><span>${d.wx!=null?f1(d.wx)+" ft":"beyond forecast"}</span></div>`:`<div class="row"><span>Anomaly</span><span>${f1(anomaly)} ft</span></div>`}
+      ${STATE.wx?`<div class="row"><span>Sea-level anomaly${d.anom!=null&&Math.abs(d.anom-STATE.wx.base)>=0.05?" (fading to normal)":""}</span><span>${f1(d.anom??STATE.wx.base)} ft</span></div><div class="row"><span>Weather (pressure + wind)</span><span>${d.wx!=null?f1(d.wx)+" ft":"beyond forecast"}</span></div>`:`<div class="row"><span>Anomaly</span><span>${f1(anomaly)} ft</span></div>`}
       <div style="margin-top:6px">${pill(lv)}</div>${lv!=="none"?`<div style="margin-top:4px;color:var(--ink2)">${loc.notes[lv]}</div>`:""}`;
     const show=e=>{const r=td.getBoundingClientRect();showTip(html,e.clientX??r.right,e.clientY??r.bottom);};
     td.addEventListener("mousemove",show); td.addEventListener("mouseleave",hideTip);
