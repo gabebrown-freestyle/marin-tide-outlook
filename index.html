@@ -207,7 +207,7 @@ a{color:var(--s1)}
     <li><b>Anomaly:</b> measured minus predicted water level at San Francisco, averaged over the hour either side of the last two high tides (or the last 25 hours if that's unavailable). The current weather effect is subtracted out, and what's left (mostly the slow Kelvin wave buildup) is carried forward unchanged.</li>
     <li><b>Street lookup:</b> flood lines for 250 streets come from a flood-connectivity model on 2018 USGS 1-meter lidar with SFEI Bay Shore Inventory barriers and tide gates treated as closed, run at 5 cm water-level steps. Six streets are calibrated from resident reports. Mill Valley (Tam Junction, Miller Ave, Almonte) uses Marin County's 6.2 ft onset for the Manzanita interchange, lidar road heights converted from Richardson Bay, and Miller closures on Oct 28 and Nov 9–13, 2026 (SF peaks 7.2–7.9 ft), with high tide about 25 minutes after SF; the rest are model estimates (about ±0.5 ft). "Behind levees / pumps" means the street is below ordinary high tides and stays dry only because of infrastructure.</li>
     <li><b>Thresholds:</b> each street's flood lines come from a 1-meter lidar flood model, SFEI's Bay shoreline data, resident photos (Jan 1–3, 2026 and Oct 27–29, 2026) and the WET app's flood lines. They are estimates. Pump stations, storm drains and rain all shift them.</li>
-    <li><b>Weather:</b> low pressure and southerly winds raise the Bay; high pressure and northerly or westerly winds lower it. Fit on 10 years of NOAA Richmond data: about −1.04 cm per millibar (the classic inverse-barometer effect) and, for a steady 10 m/s (22 mph) wind, about +17 cm (6.6 in) from the southeast or −17 cm from the northwest. It explains roughly half of a typical storm surge. Weather forecasts come from <a href="https://open-meteo.com/">Open-Meteo</a> for the Golden Gate area, and the current weather effect is removed from today's anomaly so it isn't counted twice. Weather forecasts lose skill after about 5 days, so the weather effect fades to zero by day 10. Storm surge in today's anomaly also fades (over about 3 days) toward the 14-day average at SF, which is the slow Kelvin-wave and seasonal part.</li>
+    <li><b>Weather:</b> low pressure and southerly winds raise the Bay; high pressure and northerly or westerly winds lower it. Fit on 10 years of NOAA Richmond data: about −1.04 cm per millibar (the classic inverse-barometer effect) and, for a steady 10 m/s (22 mph) wind, about +17 cm (6.6 in) from the southeast or −17 cm from the northwest. It explains roughly half of a typical storm surge. Weather forecasts come from <a href="https://open-meteo.com/">Open-Meteo</a> for the Golden Gate area, and the current weather effect is removed from today's anomaly so it isn't counted twice. Weather forecasts lose skill after about 5 days, so the weather effect fades to zero by day 10. When the weather adds 0.3 ft or more, the outlook also shows how high it could go if the surge is twice what the weather fit predicts (the fit explains about half of a typical surge): a dashed orange whisker on the chart and "Possible" flags. Storm surge in today's anomaly also fades (over about 3 days) toward the 14-day average at SF, which is the slow Kelvin-wave and seasonal part.</li>
     <li><b>Not included:</b> rain, waves, river flow, and local effects inside San Rafael Bay and Corte Madera Creek beyond what the Richmond gauge sees. During a storm, check the <a href="https://www.weather.gov/mtr/">NWS Bay Area coastal flood advisories</a>.</li>
     <li>This is a community project, not an official warning. Don't drive through floodwater.</li>
   </ul>
@@ -313,8 +313,8 @@ function renderStreet(){
   } else {
     const loc={minor:s.minor,moderate:s.moderate??Infinity,major:s.major??Infinity};
     body=`<div class="thr"><div>${pill("minor")}<b>${s.minor.toFixed(1)} ft</b></div><div>${pill("moderate")}<b>${s.moderate!=null?s.moderate.toFixed(1)+" ft":"—"}</b></div><div>${pill("major")}<b>${s.major!=null?s.major.toFixed(1)+" ft":"—"}</b></div></div>`;
-    if(days){const hits=days.map(d=>({d,lv:levelOf(loc,d.fc)})).filter(x=>x.lv!=="none");
-      body+= hits.length?`<ul>${hits.map(x=>`<li>${pill(x.lv)}<span class="when">${fmtDay(x.d.t)} · forecast ${x.d.fc.toFixed(1)} ft${x.d.rrisk?` · <b>+ rain ${x.d.rain.toFixed(1)}"</b>`:""}${x.d.wx!=null&&Math.abs(x.d.wx)>=0.05?` (weather ${f1(x.d.wx)})`:""} · ~${fmtTime(new Date(x.d.t.getTime()+(s.lag||35)*60e3))}${s.closed&&x.lv!=="minor"?(()=>{const pk=x.d.t.getTime()+(s.lag||35)*60e3;return `<br><b>Likely closed ~${fmtTime(new Date(pk+s.closed[0]*60e3))}–${fmtTime(new Date(pk+(s.closed[1]+(x.d.rrisk?60:0))*60e3))}</b>${x.d.rrisk?" (longer with rain)":""}`})():""}</span></li>`).join("")}</ul>`:`<div class="hint">${pill("none")} No flood tides in the next ${days.length} days.</div>`;}
+    if(days){const hits=days.map(d=>({d,lv:lvUp(loc,d),up:isUp(loc,d)})).filter(x=>x.lv!=="none");
+      body+= hits.length?`<ul>${hits.map(x=>`<li>${x.up?pill(x.lv).replace(/>([A-Za-z]+)</,'>Possible $1<'):pill(x.lv)}<span class="when">${fmtDay(x.d.t)} · forecast ${x.d.fc.toFixed(1)} ft${upTxt(x.d)}${x.d.rrisk?` · <b>+ rain ${x.d.rain.toFixed(1)}"</b>`:""}${x.d.wx!=null&&Math.abs(x.d.wx)>=0.05?` (weather ${f1(x.d.wx)})`:""} · ~${fmtTime(new Date(x.d.t.getTime()+(s.lag||35)*60e3))}${s.closed&&x.lv!=="minor"?(()=>{const pk=x.d.t.getTime()+(s.lag||35)*60e3;return `<br><b>Likely closed ~${fmtTime(new Date(pk+s.closed[0]*60e3))}–${fmtTime(new Date(pk+(s.closed[1]+(x.d.rrisk?60:0))*60e3))}</b>${x.d.rrisk?" (longer with rain)":""}`})():""}</span></li>`).join("")}</ul>`:`<div class="hint">${pill("none")} No flood tides in the next ${days.length} days.</div>`;}
     else body+='<div class="hint">Loading tides…</div>';
   }
   const note = s.note? `<div class="note">${s.note}.</div>` : (s.kind==="model"?`<div class="note">Estimated from 1-meter lidar and SFEI shoreline data; not yet checked against what residents see. Minor = first water on the street, moderate = about 40% of it wet, major = 40% under 6+ inches.</div>`:"");
@@ -514,9 +514,13 @@ function applyForecast(){
   if(!STATE) return; const now=STATE.now.getTime(), base=STATE.wx?STATE.wx.base:STATE.anomaly, bg=STATE.bg??base;
   for(const d of STATE.allDays){ const k=Math.max(0,(d.t.getTime()-now)/86400e3);
     const a=bg+(base-bg)*Math.exp(-k/3), wf=k<=5?1:Math.max(0,1-(k-5)/5);
-    d.anom=a; d.wx=STATE.wx&&d.wxRaw!=null&&wf>0?d.wxRaw*wf:null; d.fc=d.pred+a+(d.wx??0); }
+    d.anom=a; d.wx=STATE.wx&&d.wxRaw!=null&&wf>0?d.wxRaw*wf:null; d.fc=d.pred+a+(d.wx??0);
+    d.up=d.wx!=null&&d.wx>=0.3?d.fc+d.wx:null; }  // storm upside: the weather fit explains only ~half of surge
 }
 
+const upTxt=d=>d.up?` · <b>storm could push it to ${d.up.toFixed(1)}</b>`:"";
+const lvUp=(loc,d)=>{const a=levelOf(loc,d.fc);return a==='none'&&d.up?levelOf(loc,d.up):a;};
+const isUp=(loc,d)=>levelOf(loc,d.fc)==='none'&&d.up&&levelOf(loc,d.up)!=='none';
 function render(){
   if(!STATE) return;
   for(const d of STATE.allDays){ const tl=d.t.getTime()+35*60e3; d.rain=rainBetween(tl-3*3600e3,tl+3*3600e3); d.rrisk=rainRisk(d.fc,d.rain); }
@@ -533,11 +537,11 @@ function render(){
     <div class="card stat"><div class="label">Days with flooding somewhere</div><div class="value">${flagged} of ${days.length}</div><div class="note">At least minor flooding at one of the four locations</div></div>`;
   // alerts
   document.getElementById("alerts").innerHTML=LOCATIONS.map(loc=>{
-    const hits=days.map(d=>({d,lv:levelOf(loc,d.fc)})).filter(x=>x.lv!=="none");
+    const hits=days.map(d=>({d,lv:lvUp(loc,d),up:isUp(loc,d)})).filter(x=>x.lv!=="none");
     const local=t=>new Date(t.getTime()+loc.offsetMin*60e3);
     const rank=lv=>LEVELS.indexOf(lv);
     const top=hits.slice().sort((p,q)=>rank(q.lv)-rank(p.lv)||q.d.fc-p.d.fc).slice(0,6).sort((p,q)=>p.d.t-q.d.t);
-    const list=hits.length?`<ul>${top.map(x=>`<li>${pill(x.lv)}<span class="when">${fmtDay(x.d.t)} · ~${fmtTime(local(x.d.t))}</span></li>`).join("")}${hits.length>6?`<li class="when">Showing the ${top.length} worst of ${hits.length} flood days</li>`:""}</ul>`
+    const list=hits.length?`<ul>${top.map(x=>`<li>${x.up?pill(x.lv).replace(/>([A-Za-z]+)</,'>Possible $1<'):pill(x.lv)}<span class="when">${fmtDay(x.d.t)} · ~${fmtTime(local(x.d.t))}${x.d.up&&!x.up?` · could be worse if the storm surge is strong`:x.up?` · only if the storm surge is strong`:""}</span></li>`).join("")}${hits.length>6?`<li class="when">Showing the ${top.length} worst of ${hits.length} flood days</li>`:""}</ul>`
       :`<div class="clear">${pill("none")} No flood tides in the next ${DAYS} days.</div>`;
     return `<div class="card loc"><h3>${loc.name}</h3><div class="where">${loc.where} · minor ${loc.minor} / moderate ${loc.moderate} / major ${loc.major} ft</div>${list}</div>`;}).join("");
   // grid
@@ -553,7 +557,7 @@ function render(){
   g.querySelectorAll("td").forEach(td=>{
     const loc=LOCATIONS.find(l=>l.id===td.dataset.l), d=days[+td.dataset.i], lv=levelOf(loc,d.fc);
     const html=`<b>${loc.name}</b><div style="color:var(--ink2);margin-bottom:4px">${fmtDay(d.t)} · local high ~${fmtTime(new Date(d.t.getTime()+loc.offsetMin*60e3))}</div>
-      <div class="row"><span>Forecast (SF scale)</span><b>${d.fc.toFixed(2)} ft</b></div>
+      <div class="row"><span>Forecast (SF scale)</span><b>${d.fc.toFixed(2)} ft</b></div>${d.up?`<div class="row"><span>If storm surge is strong</span><b>up to ${d.up.toFixed(1)} ft</b></div>`:""}
       <div class="row"><span>NOAA prediction</span><span>${d.pred.toFixed(2)} ft</span></div>
       ${STATE.wx?`<div class="row"><span>Sea-level anomaly${d.anom!=null&&Math.abs(d.anom-STATE.wx.base)>=0.05?" (fading to normal)":""}</span><span>${f1(d.anom??STATE.wx.base)} ft</span></div><div class="row"><span>Weather (pressure + wind)</span><span>${d.wx!=null?f1(d.wx)+" ft":"beyond forecast"}</span></div>`:`<div class="row"><span>Anomaly</span><span>${f1(anomaly)} ft</span></div>`}
       <div style="margin-top:6px">${pill(lv)}</div>${lv!=="none"?`<div style="margin-top:4px;color:var(--ink2)">${loc.notes[lv]}</div>`:""}`;
@@ -574,7 +578,7 @@ function drawPeak(){
   const {days,anomaly}=STATE; const el=document.getElementById("peakChart");
   const hasRain=days.some(d=>d.rain!=null), RS=hasRain?48:0;
   const W=Math.max(320,el.clientWidth||900), H=280+RS, m={l:40,r:12,t:12,b:34+RS};
-  const lo=Math.floor(Math.min(...days.map(d=>d.pred))-0.3), hi=Math.ceil(Math.max(...days.map(d=>d.fc+UNCERT))+0.2);
+  const lo=Math.floor(Math.min(...days.map(d=>d.pred))-0.3), hi=Math.ceil(Math.max(...days.map(d=>Math.max(d.fc+UNCERT,d.up||0)))+0.2);
   const x=i=>m.l+(i+0.5)*(W-m.l-m.r)/days.length, y=v=>m.t+(hi-v)/(hi-lo)*(H-m.t-m.b);
   let s=svgEl(W,H)+`<title>Daily highest tide at San Francisco, forecast vs prediction</title>`;
   for(const v of niceTicks(lo,hi,0.5)) s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="${cssv('--grid')}" stroke-width="1"/><text x="${m.l-6}" y="${y(v)+4}" text-anchor="end">${v.toFixed(1)}</text>`;
@@ -583,9 +587,10 @@ function drawPeak(){
   s+=`<polygon points="${band}" fill="${cssv('--band')}"/>`;
   s+=`<polyline points="${days.map((d,i)=>`${x(i)},${y(d.pred)}`).join(" ")}" fill="none" stroke="${cssv('--muted')}" stroke-width="2" stroke-dasharray="4 4" stroke-linejoin="round"/>`;
   s+=`<polyline points="${days.map((d,i)=>`${x(i)},${y(d.fc)}`).join(" ")}" fill="none" stroke="${cssv('--s1')}" stroke-width="2" stroke-linejoin="round"/>`;
+  days.forEach((d,i)=>{ if(d.up) s+=`<line x1="${x(i)}" x2="${x(i)}" y1="${y(d.fc)}" y2="${y(d.up)}" stroke="${cssv('--moderate')}" stroke-width="2.5" stroke-dasharray="3 2"/><line x1="${x(i)-5}" x2="${x(i)+5}" y1="${y(d.up)}" y2="${y(d.up)}" stroke="${cssv('--moderate')}" stroke-width="2.5"/>`; });
   days.forEach((d,i)=>{s+=`<circle cx="${x(i)}" cy="${y(d.fc)}" r="4" fill="${cssv('--s1')}" stroke="${cssv('--surface')}" stroke-width="2"/>`;
     if(i%Math.ceil(days.length/(W<600?5:10))===0) s+=`<text x="${x(i)}" y="${H-m.b+16}" text-anchor="middle">${d.t.getMonth()+1}/${d.t.getDate()}</text>`;
-    if(d.rrisk) s+=`<path d="M${x(i)} ${y(d.fc)-17} q-5 7 0 10 q5 -3 0 -10z" fill="${cssv(d.rrisk==="high"?'--moderate':'--minor')}" stroke="${cssv('--ink')}" stroke-width="0.6"/>`;});
+    if(d.rrisk) s+=`<path d="M${x(i)+(d.up?10:0)} ${y(d.fc)-17} q-5 7 0 10 q5 -3 0 -10z" fill="${cssv(d.rrisk==="high"?'--moderate':'--minor')}" stroke="${cssv('--ink')}" stroke-width="0.6"/>`;});
   if(hasRain){ const top=H-RS+6, bh=RS-16, bw=Math.max(3,(W-m.l-m.r)/days.length*0.6), rmax=Math.max(1,...days.map(d=>d.rain||0));
     s+=`<text x="${m.l-6}" y="${top+8}" text-anchor="end" style="font-size:10px">rain</text><line x1="${m.l}" x2="${W-m.r}" y1="${top+bh}" y2="${top+bh}" stroke="${cssv('--grid')}"/>`;
     days.forEach((d,i)=>{ if(d.rain==null||d.rain<0.01) return; const hgt=Math.max(2,d.rain/rmax*bh);
@@ -605,7 +610,7 @@ function drawPeak(){
       <div class="row"><span><i class="sw" style="background:${cssv('--s1')}"></i>Forecast</span><b>${d.fc.toFixed(2)} ft</b></div>
       <div class="row"><span><i class="sw" style="background:${cssv('--muted')}"></i>Prediction</span><span>${d.pred.toFixed(2)} ft</span></div>
       ${STATE.wx?`<div class="row"><span>Weather</span><span>${d.wx!=null?f1(d.wx)+" ft":"beyond forecast"}</span></div>`:""}
-      <div class="row"><span>Range</span><span>${(d.fc-UNCERT).toFixed(1)}–${(d.fc+UNCERT).toFixed(1)} ft</span></div>
+      <div class="row"><span>Range</span><span>${(d.fc-UNCERT).toFixed(1)}–${(d.fc+UNCERT).toFixed(1)} ft</span></div>${d.up?`<div class="row"><span>If storm surge is strong</span><b>up to ${d.up.toFixed(1)} ft</b></div>`:""}
       ${d.rain!=null?`<div class="row"><span>Rain within 3 h of high</span><span>${d.rain.toFixed(2)}"</span></div>${d.rrisk?`<div style="margin-top:4px;font-weight:600">${d.rrisk==="high"?"High":"Some"} risk of drains backing up</div>`:""}`:""}
       ${hits.length?`<div style="margin-top:6px;display:grid;gap:3px">${hits.map(([l,lv])=>`<div>${pill(lv)} ${l.name}</div>`).join("")}</div>`:`<div style="margin-top:6px;color:var(--ink2)">No flooding expected at the four locations</div>`}`,e.clientX,e.clientY);};
   hit.addEventListener("mousemove",mv); hit.addEventListener("mouseleave",()=>{hideTip();xl.setAttribute("opacity",0);});
