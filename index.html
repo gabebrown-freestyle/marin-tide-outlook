@@ -775,6 +775,7 @@ let rz; addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{if(ST
 loadPast();
 load().catch(e=>{document.getElementById("hero").innerHTML=`<div class="err">Couldn't load NOAA data: ${e.message}. NOAA's API is sometimes briefly down; try reloading in a minute.</div>`;document.getElementById("meta").textContent="";});
 
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 /* ---------- add to home screen ---------- */
 (function(){
   const standalone=matchMedia("(display-mode: standalone)").matches||navigator.standalone===true||/[?&]source=homescreen/.test(location.search);
