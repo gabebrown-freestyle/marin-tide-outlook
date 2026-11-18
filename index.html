@@ -215,7 +215,7 @@ a{color:var(--s1)}
   <p class="sub">The outlook adds this fall's El Niño sea-level bump (the Kelvin wave) and the current weather to NOAA's tide predictions, then checks the result against each street's flood lines, which come from lidar and, where available, resident photos.</p>
   <ul class="method">
     <li><b>Tide:</b> NOAA's hourly predictions for the San Francisco gauge (9414290), in feet above mean lower low water. All thresholds use that same scale.</li>
-    <li><b>Rain:</b> National Weather Service 6-hour rain forecast for the Corte Madera shoreline, and live flow on Corte Madera Creek at Ross (USGS 11460000). We flag a high tide when about a quarter inch of rain is forecast within 3 hours of a tide over 6.0 ft, and call it high risk at half an inch with a tide over 6.5 ft. Those cutoffs are estimates. We don't model storm drains, pumps or creek flooding, so treat the flag as "be alert," not a street-by-street forecast.</li>
+    <li><b>Rain:</b> National Weather Service 6-hour rain forecast for the Corte Madera shoreline, and live flow on Corte Madera Creek at Ross (USGS 11460000). We flag a high tide when about a quarter inch of rain is forecast within 3 hours of a tide over 6.0 ft, and call it high risk at half an inch with a tide over 6.5 ft. Those cutoffs are estimates. We don't model storm drains, pumps or creek flooding, so treat the flag as "be alert," not a street-by-street forecast. One exception: streets that drain through the marsh or pump basins (Miller Ave, Tam Junction, the Redwood Hwy Frontage Rd, Dellwood Ct and the Lucky Drive area) are forecast to flood 0.3 ft lower when half an inch of rain is expected near high tide. On Nov 18, 2026, Miller and the Frontage Rd closed at 6.9 ft in heavy rain; their dry-weather closure line is 7.2–7.3 ft. That 0.3 ft is a first estimate from one storm.</li>
     <li><b>Anomaly:</b> measured minus predicted water level at San Francisco, averaged over the hour either side of the last two high tides (or the last 25 hours if that's unavailable). The current weather effect is subtracted out, and what's left (mostly the slow Kelvin wave buildup) is carried forward unchanged.</li>
     <li><b>Street lookup:</b> flood lines for 250 streets come from a flood-connectivity model on 2018 USGS 1-meter lidar with SFEI Bay Shore Inventory barriers and tide gates treated as closed, run at 5 cm water-level steps. Eight streets are calibrated from resident reports. Mill Valley (Tam Junction, Miller Ave, Almonte) uses Marin County's 6.2 ft onset for the Manzanita interchange, lidar road heights converted from Richardson Bay, and Miller closures on Oct 28 and Nov 9–13, 2026 (SF peaks 7.2–7.9 ft), with high tide about 25 minutes after SF; the rest are model estimates (about ±0.5 ft). "Behind levees / pumps" means the street is below ordinary high tides and stays dry only because of infrastructure.</li>
     <li><b>Thresholds:</b> each street's flood lines come from a 1-meter lidar flood model, SFEI's Bay shoreline data, resident photos (Jan 1–3, 2026 and Oct 27–29, 2026) and the WET app's flood lines. They are estimates. Pump stations, storm drains and rain all shift them.</li>
@@ -242,14 +242,14 @@ const LOCATIONS = [
   { id:"riviera", name:"Riviera Circle", where:"Larkspur, along Corte Madera Creek", offsetMin:35,
     minor:7.4, moderate:7.8, major:8.3,
     notes:{minor:"Low streets start flooding", moderate:"Widespread street flooding", major:"Deep, widespread flooding"} },
-  { id:"lucky", name:"Lucky Drive", where:"Corte Madera / Larkspur, by Hwy 101", offsetMin:40,
+  { id:"lucky", drain:true, name:"Lucky Drive", where:"Corte Madera / Larkspur, by Hwy 101", offsetMin:40,
     minor:6.9, moderate:7.85, major:8.0,
     notes:{minor:"Some water, pumps usually keep up", moderate:"Significant water on the road", major:"Deep flooding, avoid"} },
   // Mill Valley (Richardson Bay): Manzanita onset 6.2 ft from Marin County. Miller calibrated: closed daily Nov 9-13, 2026 at SF peaks 7.2-7.6 ft, and Oct 28 at 7.9.
-  { id:"tamjct", name:"Tam Junction / 101 exit", where:"Shoreline Hwy at Manzanita, Mill Valley", offsetMin:25,
+  { id:"tamjct", drain:true, name:"Tam Junction / 101 exit", where:"Shoreline Hwy at Manzanita, Mill Valley", offsetMin:25,
     minor:6.2, moderate:7.7, major:8.0,
     notes:{minor:"Water in the park-and-ride lot", moderate:"Water on Shoreline Hwy and ramp edges", major:"101 to Hwy 1 ramp likely closed"} },
-  { id:"miller", name:"Miller Ave at Tam High", where:"Along the marsh, Mill Valley", offsetMin:25,
+  { id:"miller", drain:true, name:"Miller Ave at Tam High", where:"Along the marsh, Mill Valley", offsetMin:25,
     minor:6.9, moderate:7.2, major:7.8,
     notes:{minor:"Marsh water at the road edge", moderate:"Miller likely closed for hours; detour via Laverne Ave", major:"Miller closed, deep water by the marsh"} },
 ];
@@ -323,7 +323,7 @@ function renderStreet(){
     if(days){const w=days.filter(d=>d.fc>=PROT_WATCH);
       body+= w.length?`<ul style="margin-top:10px">${w.map(d=>`<li>${pill("minor").replace("Minor","Watch")}<span class="when">${fmtDay(d.t)} · forecast ${d.fc.toFixed(1)} ft${d.wx!=null&&Math.abs(d.wx)>=0.05?` (weather ${f1(d.wx)})`:""} · ~${fmtTime(new Date(d.t.getTime()+(s.lag||35)*60e3))}</span></li>`).join("")}</ul>`:`<div class="hint" style="margin-top:10px">${pill("none")} No tides at the watch level in the next ${days.length} days.</div>`;}
   } else {
-    const loc={minor:s.minor,moderate:s.moderate??Infinity,major:s.major??Infinity};
+    const loc={minor:s.minor,moderate:s.moderate??Infinity,major:s.major??Infinity,drain:!!s.drain};
     const allAtOnce=s.kind!=="calibrated"&&s.moderate!=null&&s.moderate===s.minor;
     body= allAtOnce
       ? `<div class="thr"><div>Lowest ground on the street<b>${s.low!=null?s.low.toFixed(1)+" ft":"—"}</b></div><div>Floods all at once at<b>${s.minor.toFixed(1)} ft</b></div></div>
@@ -335,7 +335,7 @@ function renderStreet(){
   }
   if(PAST&&s.kind!=="protected"){ const ph=PAST.filter(d=>d.obs>=s.minor).slice().reverse();
     body+=`<div class="hint" style="margin-top:10px"><b>Last 30 days:</b> ${ph.length?ph.map(d=>`${fmtDay(d.ot)} (${d.obs.toFixed(1)} ft, ${LABEL[levelOf({minor:s.minor,moderate:s.moderate??Infinity,major:s.major??Infinity},d.obs)].toLowerCase()})`).join(", "):"the measured tide didn't reach this street's flood line."}</div>`; }
-  const note = s.note? `<div class="note">${s.note}.</div>` : (s.kind==="model"?`<div class="note">Estimated from 1-meter lidar and SFEI shoreline data; not yet checked against what residents see. Minor = first water on the street, moderate = about 40% of it wet, major = 40% under 6+ inches.</div>`:"");
+  const note = (s.drain?`<div class="hint" style="margin-top:8px">Drains to the Bay through the marsh or pumps, so in heavy rain (half an inch or more near high tide) it floods about ${RAIN_ADJ.ft} ft lower than these lines. The forecast above already allows for that on rainy days.</div>`:"")+(s.note? `<div class="note">${s.note}.</div>` : (s.kind==="model"?`<div class="note">Estimated from 1-meter lidar and SFEI shoreline data; not yet checked against what residents see. Minor = first water on the street, moderate = about 40% of it wet, major = 40% under 6+ inches.</div>`:""));
   el.innerHTML=`<h3>${s.name}<span class="kind">${KIND[s.kind]}</span></h3><div class="where">${s.town} · <a href="${map}" target="_blank" rel="noopener">map</a> · levels are on the SF tide gauge scale, same as the outlook below</div>${body}${note}`;
 }
 document.getElementById("street").addEventListener("input",()=>{renderStreet();renderNow();});
@@ -381,7 +381,8 @@ function renderNow(){
   // thresholds for the selected street
   let thr=null,lv="none",st="";
   if(s&&s.kind==="protected"){ thr={minor:PROT_WATCH,label:"watch level"}; }
-  else if(s){ thr={minor:s.minor,moderate:s.moderate??Infinity,major:s.major??Infinity,label:"water reaches the street"}; lv=levelOf(thr,lvl); }
+  else if(s){ const wet=s.drain&&RAIN&&(rainBetween(now-3*3600e3,now+3*3600e3)||0)>=RAIN_ADJ.rain, ra=wet?RAIN_ADJ.ft:0;
+    thr={minor:s.minor-ra,moderate:(s.moderate??Infinity)-ra,major:(s.major??Infinity)-ra,label:wet?"water reaches the street in this rain":"water reaches the street"}; lv=levelOf(thr,lvl); }
   if(thr){ const gap=thr.minor-lvl;
     st= lv!=="none"?`<div class="status st-${lv}">${LABEL[lv]} flooding level now: ${(lvl-thr.minor).toFixed(1)} ft above where ${thr.label}</div>`
       : gap<=0.5?`<div class="status st-near">Only ${gap.toFixed(1)} ft below where ${thr.label} (${thr.minor.toFixed(1)} ft)</div>`
@@ -539,8 +540,12 @@ function applyForecast(){
 
 const STORM={rain:0.25,south:8,add:0.6};  // inches within 3 h of high; northward wind stress (m/s)^2 ~ 3 m/s from the south; ft added
 const upTxt=d=>d.up?` · <b>storm could push it to ${d.up.toFixed(1)}</b>`:"";
-const lvUp=(loc,d)=>{const a=levelOf(loc,d.fc);return a==='none'&&d.up?levelOf(loc,d.up):a;};
-const isUp=(loc,d)=>levelOf(loc,d.fc)==='none'&&d.up&&levelOf(loc,d.up)!=='none';
+// Drain-limited streets (marsh / pump basins) flood lower in heavy rain: storm drains can't empty into a full bay.
+// Nov 18, 2026: Miller Ave and the Redwood Hwy Frontage Rd closed at an SF peak of 6.9 ft in ~1 in/hr rain (dry-weather closure line 7.2-7.3).
+const RAIN_ADJ={rain:0.5,ft:0.3};
+const radj=(loc,d)=>loc.drain&&d.rain!=null&&d.rain>=RAIN_ADJ.rain?RAIN_ADJ.ft:0;
+const lvUp=(loc,d)=>{const r=radj(loc,d),a=levelOf(loc,d.fc+r);return a==='none'&&d.up?levelOf(loc,d.up+r):a;};
+const isUp=(loc,d)=>{const r=radj(loc,d);return levelOf(loc,d.fc+r)==='none'&&d.up&&levelOf(loc,d.up+r)!=='none';};
 function render(){
   if(!STATE) return;
   for(const d of STATE.allDays){ const tl=d.t.getTime()+35*60e3; d.rain=rainBetween(tl-3*3600e3,tl+3*3600e3); d.rrisk=rainRisk(d.fc,d.rain);
