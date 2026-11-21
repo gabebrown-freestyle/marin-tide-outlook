@@ -237,6 +237,7 @@ a{color:var(--s1)}
   <p class="sub">The outlook adds this fall's El Niño sea-level bump (the Kelvin wave) and the current weather to NOAA's tide predictions, then checks the result against each street's flood lines, which come from lidar and, where available, resident photos.</p>
   <ul class="method">
     <li><b>Tide:</b> NOAA's hourly predictions for the San Francisco gauge (9414290), in feet above mean lower low water. All thresholds use that same scale.</li>
+    <li><b>Wind waves:</b> on the San Pablo Bay shore (Point San Pedro Rd and Peacock Gap), we flag high tides with southeast-to-south wind gusts of 30 mph or more and a tide of 6.5 ft or more ("waves could splash over the wall"), and gusts of 38 mph or more with a tide of 7.0 ft or more ("waves could flood the road"). Those lines come from two events: Nov 18, 2026 (about 6.6 ft, gusts over 30 mph, waves over the wall near Riviera Dr) and Jan 22, 1997 (about 7.0 ft, gusts near 40 mph, Peacock Dr at Point San Pedro Rd flooded). Wind is from the Open-Meteo forecast for the bay off Point San Pedro; first estimates.</li>
     <li><b>Rain:</b> National Weather Service 6-hour rain forecast for the Corte Madera shoreline, and live flow on Corte Madera Creek at Ross (USGS 11460000). We flag a high tide when about a quarter inch of rain is forecast within 3 hours of a tide over 6.0 ft, and call it high risk at half an inch with a tide over 6.5 ft. Those cutoffs are estimates. We don't model storm drains, pumps or creek flooding, so treat the flag as "be alert," not a street-by-street forecast. One exception: streets that drain through the marsh or pump basins (Miller Ave, Tam Junction, the Redwood Hwy Frontage Rd, Dellwood Ct, Point San Pedro Rd at Peacock Dr and the Lucky Drive area) are forecast to flood 0.3 ft lower when half an inch of rain is expected near high tide. On Nov 18, 2026, Miller and the Frontage Rd closed at 6.9 ft in heavy rain; their dry-weather closure line is 7.2–7.3 ft. In that much rain, closed roads also stay closed longer: we show them likely closed until about 5 hours after high tide (on Nov 18, 2026, Miller Ave, Creekside Dr and Seawolf Passage reopened 4.5 to 5 hours after the high). The 0.3 ft and the 5 hours are first estimates from one storm, and drainage gets worse as the ground saturates and creeks rise over a wet winter.</li>
     <li><b>Anomaly:</b> measured minus predicted water level at San Francisco, averaged over the hour either side of the last two high tides (or the last 25 hours if that's unavailable). The current weather effect is subtracted out, and what's left (mostly the slow Kelvin wave buildup) is carried forward unchanged.</li>
     <li><b>Street lookup:</b> flood lines for 250 streets come from a flood-connectivity model on 2018 USGS 1-meter lidar with SFEI Bay Shore Inventory barriers and tide gates treated as closed, run at 5 cm water-level steps. Eight streets are calibrated from resident reports. Mill Valley (Tam Junction, Miller Ave, Almonte) uses Marin County's 6.2 ft onset for the Manzanita interchange, lidar road heights converted from Richardson Bay, and Miller closures on Oct 28 and Nov 9–13, 2026 (SF peaks 7.2–7.9 ft), with high tide about 25 minutes after SF; the rest are model estimates (about ±0.5 ft). "Behind levees / pumps" means the street is below ordinary high tides and stays dry only because of infrastructure.</li>
@@ -355,6 +356,8 @@ function renderStreet(){
       body+= hits.length?`<ul>${hits.map(x=>`<li>${x.up?pill(x.lv).replace(/>([A-Za-z]+)</,'>Possible $1<'):pill(x.lv)}<span class="when">${fmtDay(x.d.t)} · forecast ${x.d.fc.toFixed(1)} ft${upTxt(x.d)}${x.d.rrisk?` · <b>+ rain ${x.d.rain.toFixed(1)}"</b>`:""}${x.d.wx!=null&&Math.abs(x.d.wx)>=0.05?` (weather ${f1(x.d.wx)})`:""} · ~${fmtTime(new Date(x.d.t.getTime()+(s.lag||35)*60e3))}${s.closed&&x.lv!=="minor"?(()=>{const pk=x.d.t.getTime()+(s.lag||35)*60e3;return `<br><b>Likely closed ~${fmtTime(new Date(pk+s.closed[0]*60e3))}–${fmtTime(new Date(pk+(x.d.rain!=null&&x.d.rain>=RAIN_ADJ.rain?Math.max(s.closed[1],RAIN_ADJ.closedMin):s.closed[1]+(x.d.rrisk?60:0))*60e3))}</b>${x.d.rrisk?" (longer with rain)":""}`})():""}</span></li>`).join("")}</ul>`:`<div class="hint">${pill("none")} No flood tides in the next ${days.length} days.</div>`;}
     else body+='<div class="hint">Loading tides…</div>';
   }
+  if(s.waves&&days){ const wv=days.filter(d=>waveLv(d));
+    body+=`<div class="hint" style="margin-top:10px"><b>Wind waves:</b> ${wv.length?wv.map(d=>`${fmtDay(d.t)}: ${waveLv(d)==="flood"?"<b>waves could flood the road</b>":"waves could splash over the wall"} (southeast gusts ~${Math.round(d.seGust)} mph, tide ${d.fc.toFixed(1)} ft, ~${fmtTime(new Date(d.t.getTime()+(s.lag||35)*60e3))})`).join("; ")+".":(STATE.wavesOk?"no strong southeast wind forecast at high tide in the next 16 days.":"wind forecast not loaded yet.")} This shore faces the open bay: a southeast wind can push waves onto the road well below the flood lines above.</div>`; }
   if(PAST&&s.kind!=="protected"){ const ph=PAST.filter(d=>d.obs>=s.minor).slice().reverse();
     body+=`<div class="hint" style="margin-top:10px"><b>Last 30 days:</b> ${ph.length?ph.map(d=>`${fmtDay(d.ot)} (${d.obs.toFixed(1)} ft, ${LABEL[levelOf({minor:s.minor,moderate:s.moderate??Infinity,major:s.major??Infinity},d.obs)].toLowerCase()})`).join(", "):"the measured tide didn't reach this street's flood line."}</div>`; }
   const note = (s.drain?`<div class="hint" style="margin-top:8px">Drains to the Bay through the marsh or pumps, so in heavy rain (half an inch or more near high tide) it floods about ${RAIN_ADJ.ft} ft lower than these lines. The forecast above already allows for that on rainy days.</div>`:"")+(s.note? `<div class="note">${s.note}.</div>` : (s.kind==="model"?`<div class="note">Estimated from 1-meter lidar and SFEI shoreline data; not yet checked against what residents see. Minor = first water on the street, moderate = about 40% of it wet, major = 40% under 6+ inches.</div>`:""));
@@ -528,6 +531,7 @@ async function load(){
     obs:obs.data.filter(o=>o.v!=="").map(o=>({t:parseT(o.t).getTime(),v:+o.v})),
     pred6:pa, hilo:hilo.predictions.map(h=>({t:parseT(h.t).getTime(),v:+h.v,type:h.type}))};
   render();
+  applyWaves().then(render).catch(()=>{});
   try{ await applyWeather(highs.slice(-2)); render(); }
   catch(e){ await new Promise(r=>setTimeout(r,4000));
     try{ await applyWeather(highs.slice(-2)); render(); }catch(e2){ STATE.wxErr=e2.message; render(); } }
@@ -560,6 +564,21 @@ function applyForecast(){
     d.up=d.wx!=null&&d.wx>=0.3?d.fc+d.wx:null; }  // storm upside: the weather fit explains only ~half of surge
 }
 
+// Wind waves on the open San Pablo Bay shore (Point San Pedro Rd, Peacock Gap): a southeast-to-south wind has the whole bay as fetch.
+// Nov 18, 2026: SF ~6.6 ft, south gusts 30+ mph -> waves over the wall near Riviera Dr. Jan 22, 1997: SF ~7.0 ft, SE gusts ~40 mph -> Peacock Dr / PSP flooded.
+// Gusts at the local high (+/- 2 h), from 100-200 degrees. First estimates from two events.
+const WAVE={lat:38.0,lon:-122.44,dir:[100,200],splash:{gust:30,ft:6.5},flood:{gust:38,ft:7.0}};
+async function applyWaves(){
+  const q=new URLSearchParams({latitude:WAVE.lat,longitude:WAVE.lon,hourly:"wind_gusts_10m,wind_direction_10m",wind_speed_unit:"mph",forecast_days:16,timezone:"GMT"});
+  const r=await fetch("https://api.open-meteo.com/v1/forecast?"+q); if(!r.ok) throw new Error("wind "+r.status);
+  const h=(await r.json()).hourly, T=h.time.map(t=>Date.parse(t+":00Z")), G=h.wind_gusts_10m, D=h.wind_direction_10m;
+  for(const d of STATE.allDays){ const tl=d.t.getTime()+35*60e3; let g=null;
+    for(let i=0;i<T.length;i++){ if(Math.abs(T[i]-tl)>2*3600e3||G[i]==null||D[i]==null) continue;
+      if(D[i]>=WAVE.dir[0]&&D[i]<=WAVE.dir[1]&&(g==null||G[i]>g)) g=G[i]; }
+    d.seGust=g; }
+  STATE.wavesOk=true;
+}
+const waveLv=d=>d.seGust==null?null:(d.seGust>=WAVE.flood.gust&&d.fc>=WAVE.flood.ft)?"flood":(d.seGust>=WAVE.splash.gust&&d.fc>=WAVE.splash.ft)?"splash":null;
 const STORM={rain:0.25,south:8,add:0.6};  // inches within 3 h of high; northward wind stress (m/s)^2 ~ 3 m/s from the south; ft added
 const upTxt=d=>d.up?` · <b>storm could push it to ${d.up.toFixed(1)}</b>`:"";
 // Drain-limited streets (marsh / pump basins) flood lower in heavy rain: storm drains can't empty into a full bay.
